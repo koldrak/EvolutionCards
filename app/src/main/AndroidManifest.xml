@@ -12,10 +12,19 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.EvolutionCards">
 
-        <activity android:name=".PlaceholderActivity" />
-        <activity android:name=".CollectionActivity" />
-        <activity android:name=".PlayActivity" />
-        <activity android:name=".MainActivity" android:exported="true">
+        <activity
+            android:name=".PlaceholderActivity"
+            android:screenOrientation="landscape" />
+        <activity
+            android:name=".CollectionActivity"
+            android:screenOrientation="landscape" />
+        <activity
+            android:name=".PlayActivity"
+            android:screenOrientation="landscape" />
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:screenOrientation="landscape">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
