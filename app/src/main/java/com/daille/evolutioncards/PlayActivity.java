@@ -3,6 +3,8 @@ package com.daille.evolutioncards;
 import android.os.Bundle;
 import android.widget.TextView;
 
+import androidx.appcompat.app.AlertDialog;
+
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.button.MaterialButton;
@@ -39,6 +41,9 @@ public class PlayActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_play);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().hide();
+        }
 
         turnLabel = findViewById(R.id.turnLabel);
         biomeLabel = findViewById(R.id.biomeLabel);
@@ -52,8 +57,7 @@ public class PlayActivity extends AppCompatActivity {
         MaterialButton passButton = findViewById(R.id.buttonPass);
 
         createSpeciesButton.setOnClickListener(v -> {
-            humanActionCreateSpecies();
-            endHumanTurn();
+            showCreateSpeciesDialog();
         });
 
         replaceCardButton.setOnClickListener(v -> {
@@ -130,6 +134,78 @@ public class PlayActivity extends AppCompatActivity {
         } else {
             appendLog("Humano crea una especie nueva.");
         }
+    }
+
+    private void showCreateSpeciesDialog() {
+        PlayerState human = players.get(0);
+        if (human.species.size() >= MAX_SPECIES) {
+            appendLog("No puedes crear más especies (máximo 3).");
+            return;
+        }
+        if (human.hand.size() < 2) {
+            appendLog("No tienes suficientes cartas para crear una especie.");
+            return;
+        }
+
+        CharSequence[] labels = new CharSequence[human.hand.size()];
+        boolean[] selected = new boolean[human.hand.size()];
+        for (int i = 0; i < human.hand.size(); i++) {
+            GameCard card = human.hand.get(i);
+            labels[i] = card.id + " · " + card.name + " [" + card.type + "]";
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.play_create_species_dialog_title)
+                .setMultiChoiceItems(labels, selected, (dialog, which, isChecked) -> {
+                    selected[which] = isChecked;
+                    int count = 0;
+                    for (boolean flag : selected) {
+                        if (flag) {
+                            count++;
+                        }
+                    }
+                    if (count > 2) {
+                        selected[which] = false;
+                        ((AlertDialog) dialog).getListView().setItemChecked(which, false);
+                    }
+                })
+                .setNegativeButton(R.string.play_cancel, null)
+                .setPositiveButton(R.string.play_confirm, (dialog, which) -> {
+                    List<Integer> indexes = new ArrayList<>();
+                    for (int i = 0; i < selected.length; i++) {
+                        if (selected[i]) {
+                            indexes.add(i);
+                        }
+                    }
+                    if (indexes.size() != 2) {
+                        appendLog("Debes seleccionar exactamente 2 cartas.");
+                        return;
+                    }
+
+                    GameCard c1 = human.hand.get(indexes.get(0));
+                    GameCard c2 = human.hand.get(indexes.get(1));
+                    if (!isJaw(c1) && !isJaw(c2)) {
+                        appendLog("La especie necesita al menos 1 carta de tipo mandíbula.");
+                        return;
+                    }
+
+                    int idxA = Math.max(indexes.get(0), indexes.get(1));
+                    int idxB = Math.min(indexes.get(0), indexes.get(1));
+                    GameCard first = human.hand.remove(idxA);
+                    GameCard second = human.hand.remove(idxB);
+
+                    SpeciesState species = new SpeciesState();
+                    species.cards.add(first);
+                    species.cards.add(second);
+                    species.individuals = 1;
+                    species.food = 1;
+                    species.health = 1;
+                    human.species.add(species);
+
+                    appendLog("Humano crea una especie nueva (selección manual).");
+                    endHumanTurn();
+                })
+                .show();
     }
 
     private void humanActionReplaceCard() {
