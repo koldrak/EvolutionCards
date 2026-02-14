@@ -1,3 +1,12 @@
 <resources>
-    <string name="app_name">EvolutionCards</string>
+    <string name="app_name">Evolution Cards</string>
+    <string name="menu_play">Jugar</string>
+    <string name="menu_shop">Tienda</string>
+    <string name="menu_settings">Configuración</string>
+    <string name="menu_collection">Colección</string>
+    <string name="menu_ranking">Clasificación</string>
+    <string name="placeholder_body">Sección vacía por ahora (MVP).</string>
+    <string name="collection_subtitle">Cartas de adaptación y bioma cargadas desde los documentos de diseño.</string>
+    <string name="play_intro">MVP de la fase de juego basado en el reglamento: desarrollo de especies, forrajeo y depredación.</string>
+    <string name="play_rules">Resumen rápido:\n• 2 a 3 jugadores.\n• Hasta 3 especies por jugador.\n• 1 bioma activo que modifica atributos.\n• El objetivo es adaptarse y sumar puntos.</string>
 </resources>
