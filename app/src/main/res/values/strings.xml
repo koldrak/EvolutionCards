@@ -9,4 +9,15 @@
     <string name="collection_subtitle">Cartas de adaptación y bioma cargadas desde los documentos de diseño.</string>
     <string name="play_intro">MVP de la fase de juego basado en el reglamento: desarrollo de especies, forrajeo y depredación.</string>
     <string name="play_rules">Resumen rápido:\n• 2 a 3 jugadores.\n• Hasta 3 especies por jugador.\n• 1 bioma activo que modifica atributos.\n• El objetivo es adaptarse y sumar puntos.</string>
+    <string name="play_turn">Ronda %1$d · Turno del humano</string>
+    <string name="play_biome">Bioma activo: %1$s</string>
+    <string name="play_action_create_species">Crear especie (2 cartas, 1 mandíbula)</string>
+    <string name="play_action_replace_card">Reemplazar carta no mandíbula</string>
+    <string name="play_action_pass">Pasar acción</string>
+    <string name="play_hand_title">Tu mano</string>
+    <string name="play_species_title">Tus especies</string>
+    <string name="play_scoreboard_title">Marcador</string>
+    <string name="play_create_species_dialog_title">Selecciona 2 cartas (incluye 1 mandíbula)</string>
+    <string name="play_confirm">Confirmar</string>
+    <string name="play_cancel">Cancelar</string>
 </resources>
