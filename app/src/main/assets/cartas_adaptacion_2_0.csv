@@ -1,0 +1,127 @@
+id,nombre,tipo,alimentacion,objetivo_ataque,ataque,armadura,salud,velocidad,percepcion,fertilidad,metabolismo,temperatura,habilidad
+1,Mandíbula Trituradora,Mandíbula,Carnivoro,La especie con menor velocidad,1,,,,,,,,Obtiene más 1 de alimento cada vez que un individuo es eliminado. | En Sabana: +1 Ataque durante forrajeo y ataques.
+2,Colmillos Serrados,Mandíbula,Carnivoro,La especie con mayor armadura,1,,,,,,,,Al atacar: ignora la armadura de la presa en ese ataque.
+3,Pico Cortante,Mandíbula,Carnivoro,La especie con menor velocidad,1,,,1,,,,,En Montaña: +1 Ataque durante forrajeo y ataques.
+4,Mandíbula Canina,Mandíbula,Carnivoro,La especie con menor velocidad,1,-1,,,1,,,,Al jugarla: roba 1 carta y luego descarta 1 carta.
+5,Mordida Venenosa,Mandíbula,Carnivoro,La especie con menor persepcion,1,,-1,,1,,,,Si el ataque es exitoso: el objetivo queda Envenenado.
+6,Mandíbula Proyectable,Mandíbula,Carnivoro,La especie con menor Percepción,1,,,1,,,,,Si ataca con éxito el defensor queda paralizado
+7,Dientes de Aguja,Mandíbula,Carnivoro,La especie con menor Percepción,1,,,,1,,,,En Arrecife: +1 Ataque durante forrajeo y ataques.
+8,Mandíbula Filtradora,Mandíbula,Carnivoro,La especie con menor velocidad,,,,,1,,,,Esta especie obtiene 1 comida sin depender de la zona de forrageo en cada turno
+9,Pico Perforador,Mandíbula,Carnivoro,La especie con menor Percepción,,,,,2,,,,
+10,Mandíbula Omnívora,Mandíbula,Carnivoro,la especie con menor velocidad,1,,,,,,,,En Bosque: +1 Ataque
+11,Molares Trituradores,Mandíbula,Hervivoro,----,1,,,,,,,,
+12,Boca Succionadora,Mandíbula,Carnivoro,La especie con menor Percepción,,,,,2,,,,Si ataca con éxito el defensor queda paralizado
+13,Colmillos Curvos,Mandíbula,Carnivoro,La especie con menor persepcion,2,,,-1,,,,,En Sabana: +1 Ataque
+14,Mandíbula infecciosa,Mandíbula,Carnivoro,La especie con menor defensa,2,,,,,,,,Si el ataque es exitoso: aplica un estado aleatorio a la especie objetivo.
+15,Mandíbula con colmillos,Mandíbula,Omnívoro,La especie con menor defensa,1,2,,-1,-1,,,,al atacar obtiene +1 de ataque
+16,Pelaje Espeso,Pelaje,,,,1,1,-1,,,,1,En Glaciares: +1 Armadura.
+17,Pelaje Impermeable,Pelaje,,,,1,1,1,,,,1,Al jugarla: mira la mano de un rival y elige 1 carta; ese rival la descarta. | En Tundra: +1 Armadura.
+18,Plumas Aislantes,Pelaje,,,,,,-1,,,,1,+1 de velocidad si tiene una | En Glaciares: +1 Armadura.
+19,Caparazón Óseo,Pelaje,,,,4,,-2,,,,1,Si recibe 0 de daño tras un ataque el atacante queda aturdido
+20,Exoesqueleto Quitinoso,Pelaje,,,,2,,1,,,,-2,En Montaña: +1 Armadura.
+21,Escamas Reforzadas,Pelaje,,,,1,1,,,,,-1,En Manglar: +1 Armadura.
+22,Piel Tóxica,Pelaje,,,,,1,,1,,,-1,Si es dañado por un ataque el atacante queda envenenado. | En Jungla: +1 Armadura.
+23,Piel Gruesa,Pelaje,,,,3,3,-4,1,,,,En Sabana: +1 Armadura.
+24,Patrón de Camuflaje,Pelaje,,,,,,,2,,,,En Jungla: +1 Armadura.
+25,Cromatogoros,Pelaje,,,,-1,,,3,,,,En Desierto: +1 Armadura.
+26,Piel Elástica,Pelaje,,,,1,1,1,,,,-1,obtiene +1 de velocidad en playa y arrecife
+27,Espinas Dérmicas,Pelaje,,,,1,,-1,,,,,Si es dañado por un ataque el atacante recibe 1 de daño | En Montaña Fría: +1 Armadura.
+28,Escamas Plateadas,Pelaje,,,,1,,1,-2,,,-1,Al jugarla: elige una especie rival; queda Confundida.
+29,Piel Rugosa,Pelaje,,,,,2,,,,,1,
+30,Cobertura Estacional,Pelaje,,,,1,1,,,,,,al jugarla el usuario selecciona si quiere subir o bajar la temperatura de la especie en 1 | En Tundra: +1 Armadura.
+31,Patas Saltadoras,Extremidades,,,,,,2,,,,,Al jugarla: roba 1 carta y luego descarta 1 carta.
+32,Garras Retráctiles,Extremidades,,,1,,,,,,,,Al jugarla: intercambia 2 cartas de tu mano con 2 cartas al azar de la mano de un rival. | En Montaña: +1 Velocidad.
+33,Aletas Potentes,Extremidades,,,,,,1,,,,,manglares y arrecife +1 de velocidad
+34,Patas Excavadoras,Extremidades,,,,1,,,1,,,,al jugarla el usuario selecciona si quiere subir o bajar la temperatura de la especie en 2 | En Estepa: +1 Velocidad.
+35,Membrana Planeadora,Alas,,,-1,,-1,2,2,,,,En Taiga: +1 Velocidad.
+36,Alas Batientes,Alas,,,-1,-2,1,4,,,,,+ 2 de ataque contra especies con alas. | En Montaña: +1 Velocidad.
+37,Patas Largas,Extremidades,,,1,-1,,1,,,,,Al jugarla: elige una especie; aumenta su fertilidad en +1 (permanente).
+38,Almohadillas Adhesivas,Extremidades,,,,,,,1,,,,+2 de velocidad en jungla y montaña. | En Montaña: +1 Velocidad.
+39,Extremidades Prensiles,Extremidades,,,-1,,,1,1,,,,+2 de velocidad en jungla y bosque. | En Jungla: +1 Velocidad.
+40,Tentáculos,Extremidades,,,,,1,-1,1,,,,Al jugarla: cambia 1 adaptación de una especie por 1 de tu mano.
+41,Aleta Dorsal Estabilizadora,Extremidades,,,,,,2,1,,,,"Obtiene +1 de velocidad en manglares, playa y arrecife. -1 en otros biomas"
+42,Patas Anchas,Extremidades,,,,,,1,,,,1,"+2 de velocidad en taiga, estepa, tundras, montaña fría y glaciares | En Glaciares: +1 Velocidad."
+43,Garras para Cavado,Extremidades,,,1,,,,,,,,Al jugarla: roba 1 carta del mazo de otro jugador
+44,Patas Robustas,Extremidades,,,,1,1,,,,,,En Sabana: +1 Velocidad.
+45,Extremidades Segmentadas,Extremidades,,,,-1,1,2,,,,,si es atacado por emboscada recibe un bono de +2 de velocidad
+46,Alas Cortas,Alas,,,,-2,,2,1,,,,mira la mano de otro jugador y desearle 2 cartas
+47,Patas de Aceleración,Extremidades,,,,,1,4,,,,,
+48,Almohadilla nupcial,Extremidades,,,,,,-1,1,-1,,,En Manglar: +1 Velocidad.
+49,Regeneración de Extremidad,Extremidades,,,,,1,-1,,,,,Al jugarla: cura 2 punto de salud de esta especie (si está dañada).
+50,Patas Trepadoras,Extremidades,,,,,,2,1,,,,Mientras esté en juego: hay +1 planta adicional en la Zona de Forraje al crecer plantas.
+51,Cola Prensil,Cola,,,,,,,,,,,Obtiene +2 de velocidad en jungla y bosque.
+52,Cola Látigo,Cola,,,1,,,,,,,,"Al jugarla: busca una carta en tu mazo y ponla en tu mano, luego naraja el mazo"
+53,Cola Propulsora,Cola,,,,,,2,,,,,"si está en un bioma de playa o manglar, obtiene más 2 de velocidad al atacar."
+54,Cola Camuflada,Cola,,,-1,,1,,2,,,,Mientras esté en juego: los ataques contra esta especie requieren emboscada para ignorar su escape.
+55,Cola Venenosa,Cola,,,2,,,,-1,,,,Si el ataque es exitoso: el objetivo queda Envenenado. | En Estepa: +1 Velocidad.
+56,Cola Afilada,Cola,,,1,1,,,,,,,
+57,Cola Equilibradora,Cola,,,,-1,,2,1,,,,
+58,Autotomía Caudal,Cola,,,,,-1,2,1,,,,"si un rival te ataca a esta especie  y falla, ese rival queda Confundido."
+59,Cola Plumosa,Cola,,,,,,,,1,,,En Estepa: +1 Velocidad.
+60,Cola bufanda térmica,Cola,,,,,,,1,,,,Al jugarla: selcciona si quieres que tu especie tenga +1 o -1 de temperatura al tener está adaptación
+61,Cola Sensorial,Cola,,,,,,,2,,,,En Estepa: +1 Velocidad.
+62,Cola Reserva,Cola,,,-1,,2,,,,,,En lugar de eliminar un individuo de esta especie elimina esta carta y restaura por completo la salud de la especie.
+63,Cola Natatoria,Cola,,,,,,2,,,,,Al jugarla: mira la mano de un rival y elige 1 carta; ese rival la descarta.
+64,Cola Cortante,Cola,,,,,,1,1,,,,"Mientras esté en juego: si un rival te ataca y falla, ese rival queda Confundido."
+65,Cola Señuelo,Cola,,,,,1,,,,,,"El próximo ataque por emboscada resulta en exito siempre, una vez usada está habilidad Descarta está adaptación. | En Estepa: +1 Velocidad."
+66,Visión Nocturna,Sentido,,,,,,,2,,,,En Taiga: +1 Percepción.
+67,Ojos Compuestos,Sentido,,,,-1,,,2,,,,En Llanura: +1 Percepción.
+68,Ecolocación,Sentido,,,-1,-1,-1,,3,,,,En Montaña Fría: +1 Percepción.
+69,Bigotes Sensoriales,Sentido,,,-1,,,,2,,,,Al jugarla: roba 1 carta
+70,Línea Lateral,Sentido,,,,-1,,,,,,,Al jugarla: mira la mano de un rival y elige 1 carta; ese rival la descarta.
+71,Olfato Agudo,Sentido,,,-1,,,,,,,,"Al jugarla: mira las 5 primeras cartas de tu mazo, selecciona 1 y ponla en tu mano | En Taiga: +1 Percepción."
+72,Visión Térmica,Sentido,,,,,,-1,2,,,,Al jugarla: elige una especie rival; queda Confundida. | En Desierto: +1 Percepción.
+73,Audición Direccional,Sentido,,,,-1,,-1,,,,,Al jugarla: intercambia 1 cartas de tu mano con 1 cartas al azar de la mano de un rival. | En Taiga: +1 Percepción.
+74,Electrorrecepción,Sentido,,,,-1,1,-2,3,,,,
+75,Visión Panorámica,Sentido,,,-1,,,,2,,,,En Llanura: +1 Percepción.
+76,Detección de Presión,Sentido,,,,-1,-1,,2,,,,Mientras esté en juego: la especie puede pagar 1 comida para ignorar un estado negativo (una vez por ronda).
+77,Ojos Independientes,Sentido,,,,,1,-3,2,-1,,,En Desierto: +1 Percepción.
+78,Sismorrecepción,Sentido,,,,,-1,,2,,,,En Montaña Fría: +1 Percepción.
+79,Super fuerza,Sentido,,,2,1,,-1,,1,,,En Llanura: +1 Percepción.
+80,Visión Ultravioleta,Sentido,,,-1,,,,1,,,1,En Montaña Fría: +1 Percepción.
+81,Audición Subacuática,Sentido,,,,,,1,,,,,"obtiene mas 2 de persepcion en manglar, arecife, playa y Glaciares"
+82,Sensores de Corriente,Sentido,,,,,,,2,,,,Al jugarla: roba 1 carta y luego descarta 1 carta.
+83,Apotematismo,Sentido,,,,2,1,,-3,,,,
+84,Osteodermos dérmicos,Pelaje,,,,2,1,,-1,,,,
+85,Conglobación,Misceláneos,,,,2,1,-1,-2,,,,En Bosque: +1 Salud.
+86,Autohémorragia refleja,Misceláneos,,,1,1,,-1,,,,,Si recibe 0 de daño tras un ataque el atacante queda aturdido
+87,Sangre Caliente,Misceláneos,,,,,1,,,,,1,En Glaciares: +1 Salud.
+88,Hibernación,Misceláneos,,,,,4,-3,-3,,,1,Mientras esté en juego: esta especie puede ignorar 1 consumo de alimento por ronda. | En Tundra: +1 Salud.
+89,Migración Estacional,Misceláneos,,,,,1,,,-1,,1,Al jugarla: mueve 2 planta desde la Zona de Forraje a tu reserva de comida. | En Tundra: +1 Salud.
+90,Reproducción Rápida,Misceláneos,,,,,,1,,-1,1,,Al jugarla: roba 1 carta y luego descarta 1 carta.
+91,Cuidado Parental,Misceláneos,,,-1,1,,,-1,-1,,,En Sabana: +1 Salud.
+92,Antenas filiformes,Misceláneos,,,,,,2,-1,,,,En Llanura: +1 Salud.
+93,Bioluminiscencia,Misceláneos,,,,,,,-1,-1,,,
+94,Metamorfosis Completa,Misceláneos,,,,,-1,3,-2,,,,En Bosque: +1 Salud.
+95,Defensa Química,Misceláneos,,,,1,1,,,,,,Tras realizar una defensa su atacante queda confundido
+96,Regeneración Celular,Misceláneos,,,,,2,,,,,,Al jugarla: cura 1 punto de salud de esta especie (si está dañada).
+97,Exhibición Intimidante,Misceláneos,,,,1,,,,,,,Al jugarla: elige una especie rival; queda en Terror.
+98,Simbiosis,Misceláneos,,,,,,,-2,1,,,"Selecciona una especie, cada vez que alguna gane ""fichas de comida"" la otra tambien"
+99,Resistencia a Toxinas,Misceláneos,,,,,2,,,,,,inmunidad a todos los estados
+100,Especialización Dietaria,Misceláneos,,,,1,-1,,,,,,"Mientras esté en juego: la primera vez que esta especie sea atacada cada ronda, el atacante pierde 1 velocidad para ese ataque."
+101,lengua extensible,Misceláneos,,,,,,-3,4,,,,si golpea a la presa está queda paralizada
+102,Molares de Pastoreo,Mandíbula,Herbívoro,,1,,,,,-1,,,"Al forrajear: si extraes al menos 1 comida, obtén +1 comida extra | En Pradera: +1 Ataque durante forrajeo y ataques."
+103,Mandíbula Rumiadora,Mandíbula,Herbívoro,,1,,,,,-1,,,En Pradera: +1 Ataque durante forrajeo y ataques.
+104,Incisivos de Roedor,Mandíbula,Herbívoro,,1,,,,,-1,,,Al jugarla: puedes cambiar la carta de bioma activa por una al azar.
+105,Pico Folívoro,Mandíbula,Herbívoro,,1,,,,,1,,,En Bosque: +1 Ataque durante forrajeo y ataques.
+106,Mandíbula de Broteo,Mandíbula,Herbívoro,,1,,1,,,,,,"Si no logro obtener fichas de comida en la fase de forrajeo, agrega 1 ficha de comida a esta especie"
+107,Dentición Hipodonta,Mandíbula,Herbívoro,,1,,,,,-1,,,Si forrajeas en Pradera/Estepa: obtén +1 comida adicional. | En Pradera: +1 Ataque durante forrajeo y ataques.
+108,Mandíbula Lofodonta,Mandíbula,Herbívoro,,2,,,,,,,,Al forrajear: puedes repartir la comida obtenida entre 2 especies aliadas herbivoras adyacentes.
+109,Mandíbula Excavadora,Mandíbula,Omnívoro,,1,,1,-1,-1,,,,
+110,Boca de Filtrado Vegetal,Mandíbula,Herbívoro,,1,,,,,,,,En Playa: +1 Ataque durante forrajeo y ataques.
+111,Dientes en Peine,Mandíbula,Herbívoro,,1,,,,,,,,
+112,Pico Granívoro,Mandíbula,Herbívoro,,1,,-1,,,,,,Al jugarla : coloca 2 de comida sobre una de tus especies | En Taiga: +1 Ataque durante forrajeo y ataques.
+113,Mandíbula de Corte de Corteza,Mandíbula,Herbívoro,,1,,,,,,-1,,"Mientras esté en juego: si sufre un ataque fallido (el rival no logra alcanzarla), gana 1 comida (una vez por ronda)."
+114,Boca Succionadora de Néctar,Mandíbula,Herbívoro,,2,,,,,1,,,En Jungla: +1 Ataque durante forrajeo y ataques.
+115,Mandíbula de Trituración de Conchas Vegetales,Mandíbula,Herbívoro,,1,1,,,,,,,En Playa: +1 Ataque durante forrajeo y ataques.
+116,Dentición Selectiva,Mandíbula,Herbívoro,,2,,,,,,,,En Pradera: +1 Ataque durante forrajeo y ataques.
+117,Patas Dunares,Extremidades,,,-1,,,3,-1,,,-1,"Esta especie tiene -1 de metabolismo en desierto, montaña y sabana"
+118,Pezuñas Escaladoras,Extremidades,,,,,,3,-1,,,-1,"Esta especie tiene +1 de velocidad en desierto, montaña y sabana | En Montaña Fría: +1 Velocidad."
+119,Placas de Corteza,Misceláneos,,,,4,,,-2,,,-1,
+120,Pelaje Ártico,Pelaje,,,,2,,,,,,2,En Glaciares: +1 Armadura.
+121,Zancada de Pradera,Extremidades,,,,,,3,-2,,,1,En Pradera: +1 Velocidad.
+122,Aletas Litorales,Extremidades,,,,,,3,-2,,,-1,
+123,Piel Osmorreguladora,Misceláneos,,,,1,,,,,,-1,
+124,Escamas Reflectantes (Desierto),Pelaje,,,,2,,,,,,-1,En Desierto: +1 Armadura.
+125,Garras de Hielo,Extremidades,,,,,,3,-2,,,-1,"Esta especie tiene +1 de velocidad en Taiga, Estepa y Tundra | En Tundra: +1 Velocidad."
+126,Microhábitat Favorable,Sentido,,,,2,,,-1,,,,Al jugarla : roba una carta si estas en llanura o estepa | En Llanura: +1 Percepción.
