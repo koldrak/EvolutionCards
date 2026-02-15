@@ -294,8 +294,8 @@ public class PlayActivity extends AppCompatActivity {
                     GameCard second = human.hand.remove(idxB);
 
                     SpeciesState species = new SpeciesState();
-                    species.cards.add(first);
-                    species.cards.add(second);
+                    species.addCard(first, random);
+                    species.addCard(second, random);
                     species.individuals = 1;
                     species.food = 1;
                     species.health = 1;
@@ -350,8 +350,8 @@ public class PlayActivity extends AppCompatActivity {
         player.hand.remove(second);
 
         SpeciesState species = new SpeciesState();
-        species.cards.add(first);
-        species.cards.add(second);
+        species.addCard(first, random);
+        species.addCard(second, random);
         species.individuals = 1;
         species.food = 1;
         species.health = 1;
@@ -383,7 +383,7 @@ public class PlayActivity extends AppCompatActivity {
         if (!addCandidates.isEmpty()) {
             SpeciesState targetSpecies = addCandidates.get(random.nextInt(addCandidates.size()));
             GameCard addition = handCandidates.get(random.nextInt(handCandidates.size()));
-            targetSpecies.cards.add(addition);
+            targetSpecies.addCard(addition, random);
             player.hand.remove(addition);
             return true;
         }
@@ -1115,7 +1115,7 @@ public class PlayActivity extends AppCompatActivity {
         builder.append(createStatLine("Percepción", species.getPerception(), 0xFFBDBDBD)).append("\n");
         builder.append(createStatLine("Metabolismo", species.getMetabolism(activeBiome), 0xFFE6A57E)).append("\n");
         builder.append(createStatLine("Fertilidad", species.getFertility(), 0xFFBA68C8)).append("\n");
-        builder.append(createStatLine("Temperatura", getBiomeTemperatureValue(activeBiome), 0xFFF5F5F5));
+        builder.append(createStatLine("Temperatura", species.getTemperature(activeBiome), 0xFFF5F5F5));
         return builder;
     }
 
@@ -1182,7 +1182,7 @@ public class PlayActivity extends AppCompatActivity {
             }
         }
 
-        appendAttributeLine(builder, "Temperatura", getBiomeTemperatureValue(activeBiome), 0xFFF5F5F5);
+        appendAttributeLine(builder, "Temperatura", species.getTemperature(activeBiome), 0xFFF5F5F5);
         return builder;
     }
 
@@ -1194,6 +1194,9 @@ public class PlayActivity extends AppCompatActivity {
     }
 
     private CharSequence createStatLine(String label, int rawValue, int color) {
+        if ("Temperatura".contentEquals(label)) {
+            return createTemperatureStatLine(rawValue);
+        }
         int value = clamp(rawValue, ATTRIBUTE_MIN, ATTRIBUTE_MAX);
         SpannableStringBuilder line = new SpannableStringBuilder();
 
@@ -1206,6 +1209,20 @@ public class PlayActivity extends AppCompatActivity {
             line.append(i < value ? "█" : "░");
             int textColor = i < value ? color : Color.parseColor("#607D8B");
             line.setSpan(new ForegroundColorSpan(textColor), start, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        return line;
+    }
+
+    private CharSequence createTemperatureStatLine(int value) {
+        SpannableStringBuilder line = new SpannableStringBuilder();
+        line.append("Temperatura=");
+        int valueStart = line.length();
+        line.append(String.valueOf(value));
+        line.setSpan(new StyleSpan(android.graphics.Typeface.BOLD), 0, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        if (value > 0) {
+            line.setSpan(new ForegroundColorSpan(0xFFE53935), valueStart, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        } else if (value < 0) {
+            line.setSpan(new ForegroundColorSpan(0xFF1E88E5), valueStart, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
         return line;
     }
@@ -1294,6 +1311,7 @@ public class PlayActivity extends AppCompatActivity {
 
         final List<GameCard> cards = new ArrayList<>();
         final List<Status> statuses = new ArrayList<>();
+        final Map<String, List<Integer>> selectedTemperatureEffects = new java.util.HashMap<>();
         int individuals;
         int food;
         int health;
@@ -1392,10 +1410,10 @@ public class PlayActivity extends AppCompatActivity {
 
         int getMetabolism(GameCard biome) {
             int metabolism = Math.max(1, individuals + getBaseStat("metabolism") + getBiomeModifier("Metabolismo"));
-            int biomeTemp = getBiomeTemperatureValue(biome);
-            if (biomeTemp >= 5 || biomeTemp <= -5) {
+            int currentTemperature = getTemperature(biome);
+            if (currentTemperature >= 5 || currentTemperature <= -5) {
                 metabolism += 2;
-            } else if (biomeTemp >= 3 || biomeTemp <= -3) {
+            } else if (currentTemperature >= 3 || currentTemperature <= -3) {
                 metabolism += 1;
             }
             if (hasStatus(Status.ENFERMEDAD)) {
@@ -1429,7 +1447,9 @@ public class PlayActivity extends AppCompatActivity {
                 return false;
             }
             int idx = replaceable.get(random.nextInt(replaceable.size()));
-            cards.set(idx, replacement);
+            GameCard removed = cards.remove(idx);
+            unregisterTemperatureChoice(removed);
+            addCard(replacement, random);
             return true;
         }
 
@@ -1445,8 +1465,74 @@ public class PlayActivity extends AppCompatActivity {
                     return;
                 }
                 int idx = replaceable.get(random.nextInt(replaceable.size()));
-                cards.remove(idx);
+                GameCard removed = cards.remove(idx);
+                unregisterTemperatureChoice(removed);
             }
+        }
+
+
+        int getTemperature(GameCard biome) {
+            return getBiomeTemperatureValue(biome) + getBaseStat("temperature") + getSelectedTemperatureEffects();
+        }
+
+        void addCard(GameCard card, Random random) {
+            cards.add(card);
+            registerTemperatureChoice(card, random);
+        }
+
+        private int getSelectedTemperatureEffects() {
+            int total = 0;
+            for (List<Integer> effects : selectedTemperatureEffects.values()) {
+                for (int effect : effects) {
+                    total += effect;
+                }
+            }
+            return total;
+        }
+
+        private void registerTemperatureChoice(GameCard card, Random random) {
+            Integer magnitude = getSelectableTemperatureMagnitude(card);
+            if (magnitude == null || magnitude <= 0) {
+                return;
+            }
+            int selectedEffect = random.nextBoolean() ? magnitude : -magnitude;
+            String key = normalizeSimple(card.id);
+            List<Integer> effects = selectedTemperatureEffects.get(key);
+            if (effects == null) {
+                effects = new ArrayList<>();
+                selectedTemperatureEffects.put(key, effects);
+            }
+            effects.add(selectedEffect);
+        }
+
+        private void unregisterTemperatureChoice(GameCard card) {
+            Integer magnitude = getSelectableTemperatureMagnitude(card);
+            if (magnitude == null || magnitude <= 0) {
+                return;
+            }
+            String key = normalizeSimple(card.id);
+            List<Integer> effects = selectedTemperatureEffects.get(key);
+            if (effects == null || effects.isEmpty()) {
+                return;
+            }
+            effects.remove(effects.size() - 1);
+            if (effects.isEmpty()) {
+                selectedTemperatureEffects.remove(key);
+            }
+        }
+
+        private Integer getSelectableTemperatureMagnitude(GameCard card) {
+            if (card == null || card.id == null) {
+                return null;
+            }
+            String normalizedId = normalizeSimple(card.id);
+            if ("a30".equals(normalizedId) || "a60".equals(normalizedId)) {
+                return 1;
+            }
+            if ("a34".equals(normalizedId)) {
+                return 2;
+            }
+            return null;
         }
 
         void applyStatus(Status status) {
@@ -1505,6 +1591,9 @@ public class PlayActivity extends AppCompatActivity {
                     break;
                 case "metabolism":
                     raw = info.metabolism;
+                    break;
+                case "temperature":
+                    raw = info.temperature;
                     break;
                 default:
                     raw = "";
