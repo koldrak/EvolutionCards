@@ -143,7 +143,7 @@ public class PlayActivity extends AppCompatActivity {
             if (gameOver) {
                 return;
             }
-            appendLog("Humano pasa su acción.");
+            humanActionDiscardHand();
             endHumanTurn();
         });
 
@@ -188,7 +188,7 @@ public class PlayActivity extends AppCompatActivity {
             players.add(state);
         }
 
-        beginPhase(Phase.PLAYER_ACTION, "Ronda 1 lista. Elige una acción: crear especie, reemplazar carta o pasar.");
+        beginPhase(Phase.PLAYER_ACTION, "Ronda 1 lista. Elige una acción: crear especie, reemplazar carta o descartar mano.");
         appendLog("Partida iniciada. Se generaron " + playerCount + " mazos aleatorios.");
     }
 
@@ -314,6 +314,14 @@ public class PlayActivity extends AppCompatActivity {
         } else {
             appendLog("Humano reemplaza una carta en una especie.");
         }
+    }
+
+    private void humanActionDiscardHand() {
+        PlayerState human = players.get(0);
+        int discardedCards = human.hand.size();
+        human.hand.clear();
+        human.drawTo(HAND_TARGET);
+        appendLog("Humano descarta su mano (" + discardedCards + " cartas) y roba " + human.hand.size() + " cartas nuevas.");
     }
 
     private boolean tryCreateSpecies(PlayerState player) {

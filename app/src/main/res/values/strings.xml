@@ -14,7 +14,7 @@
     <string name="play_biome">Bioma activo: %1$s</string>
     <string name="play_action_create_species">Crear especie (2 cartas, 1 mandíbula)</string>
     <string name="play_action_replace_card">Reemplazar carta no mandíbula</string>
-    <string name="play_action_pass">Pasar acción</string>
+    <string name="play_action_discard_hand">Descartar mano</string>
     <string name="play_hand_title">Tu mano</string>
     <string name="play_species_title">Tus especies</string>
     <string name="play_scoreboard_title">Marcador</string>
