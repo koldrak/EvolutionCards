@@ -777,17 +777,105 @@ public class PlayActivity extends AppCompatActivity {
         TextView type = panel.findViewById(R.id.detailCardType);
         TextView rarity = panel.findViewById(R.id.detailCardRarity);
         TextView description = panel.findViewById(R.id.detailCardDescription);
+        TextView attackTarget = panel.findViewById(R.id.detailCardAttackTarget);
+        TextView stats = panel.findViewById(R.id.detailCardStats);
+        TextView ability = panel.findViewById(R.id.detailCardAbility);
+
+        CardDesignDetails.DesignCardInfo designInfo = CardDesignDetails.findByGameCard(card);
 
         title.setText(card.id + " · " + card.name);
         type.setText("Tipo: " + card.type);
         rarity.setText("Rareza: " + (card.metadata == null || card.metadata.trim().isEmpty() ? "Sin dato" : card.metadata));
         description.setText("Descripción: " + (card.description == null || card.description.trim().isEmpty() ? "Sin descripción" : card.description));
+        String targetText = buildAttackTargetText(card, designInfo);
+        if (targetText.isEmpty()) {
+            attackTarget.setVisibility(View.GONE);
+        } else {
+            attackTarget.setVisibility(View.VISIBLE);
+            attackTarget.setText(targetText);
+        }
+        String statsText = buildStatsText(designInfo);
+        stats.setText("Estadísticas que modifica: " + (statsText.isEmpty() ? "No modifica estadísticas." : statsText));
+        String abilityText = buildAbilityText(designInfo);
+        ability.setText("Habilidad: " + abilityText);
 
         new AlertDialog.Builder(this)
                 .setTitle("Detalle de carta")
                 .setView(panel)
                 .setPositiveButton(R.string.play_confirm, null)
                 .show();
+    }
+
+    private String buildAttackTargetText(GameCard card, CardDesignDetails.DesignCardInfo designInfo) {
+        if (designInfo == null) {
+            return "";
+        }
+        if (!"mandíbula".equalsIgnoreCase(card.type)) {
+            return "";
+        }
+        if (!"carnivoro".equalsIgnoreCase(normalizeSimple(designInfo.feedingType))) {
+            return "";
+        }
+        if (isBlankOrDash(designInfo.attackTarget)) {
+            return "";
+        }
+        return "Objetivo de ataque: " + designInfo.attackTarget;
+    }
+
+    private String buildStatsText(CardDesignDetails.DesignCardInfo designInfo) {
+        if (designInfo == null) {
+            return "";
+        }
+        List<String> parts = new ArrayList<>();
+        appendStat(parts, "Ataque", designInfo.attack);
+        appendStat(parts, "Armadura", designInfo.armor);
+        appendStat(parts, "Salud", designInfo.health);
+        appendStat(parts, "Velocidad", designInfo.speed);
+        appendStat(parts, "Percepción", designInfo.perception);
+        appendStat(parts, "Fertilidad", designInfo.fertility);
+        appendStat(parts, "Metabolismo", designInfo.metabolism);
+        appendStat(parts, "Temperatura", designInfo.temperature);
+        return String.join(" | ", parts);
+    }
+
+    private String buildAbilityText(CardDesignDetails.DesignCardInfo designInfo) {
+        if (designInfo == null || isBlankOrDash(designInfo.ability)) {
+            return "Sin habilidad";
+        }
+        return designInfo.ability;
+    }
+
+    private void appendStat(List<String> parts, String label, String rawValue) {
+        if (isBlankOrDash(rawValue)) {
+            return;
+        }
+        try {
+            double value = Double.parseDouble(rawValue);
+            if (Math.abs(value) < 0.00001d) {
+                return;
+            }
+            int intValue = (int) value;
+            if (Math.abs(value - intValue) < 0.00001d) {
+                parts.add(label + " " + (intValue > 0 ? "+" : "") + intValue);
+                return;
+            }
+        } catch (NumberFormatException ignored) {
+            // Si no es número, se muestra tal cual.
+        }
+        parts.add(label + " " + rawValue);
+    }
+
+    private String normalizeSimple(String text) {
+        return text == null ? "" : text.trim().toLowerCase(Locale.US).replace("í", "i");
+    }
+
+    private boolean isBlankOrDash(String value) {
+        if (value == null) {
+            return true;
+        }
+        String normalized = value.trim();
+        return normalized.isEmpty() || "-".equals(normalized) || "—".equals(normalized)
+                || "----".equals(normalized);
     }
 
     private void showSpeciesDetailPanel(PlayerState player, int speciesIndex, SpeciesState species) {
