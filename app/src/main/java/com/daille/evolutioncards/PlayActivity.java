@@ -1643,7 +1643,7 @@ public class PlayActivity extends AppCompatActivity {
         }
 
         int getFertility() {
-            return Math.max(1, individuals + getBaseStat("fertility") + getBiomeModifier("Fertilidad"));
+            return Math.max(1, cards.size());
         }
 
         int getNonJawCardCount() {
