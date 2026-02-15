@@ -108,7 +108,11 @@
                     android:padding="4dp"
                     android:text="@string/play_log_title"
                     android:textSize="12sp"
-                    android:textStyle="bold" />
+                    android:textStyle="bold"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="8sp"
+                    android:autoSizeMaxTextSize="12sp"
+                    android:autoSizeStepGranularity="1sp" />
 
                 <TextView
                     android:id="@+id/bot2DeckLabel"

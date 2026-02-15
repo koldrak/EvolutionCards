@@ -10,6 +10,7 @@
     <string name="play_intro">MVP de la fase de juego basado en el reglamento: desarrollo de especies, forrajeo y depredación.</string>
     <string name="play_rules">Resumen rápido:\n• 2 a 3 jugadores.\n• Hasta 3 especies por jugador.\n• 1 bioma activo que modifica atributos.\n• El objetivo es adaptarse y sumar puntos.</string>
     <string name="play_turn">Ronda %1$d · Turno del humano</string>
+    <string name="play_turn_phase">Ronda %1$d · %2$s</string>
     <string name="play_biome">Bioma activo: %1$s</string>
     <string name="play_action_create_species">Crear especie (2 cartas, 1 mandíbula)</string>
     <string name="play_action_replace_card">Reemplazar carta no mandíbula</string>

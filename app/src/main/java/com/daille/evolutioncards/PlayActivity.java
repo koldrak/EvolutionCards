@@ -25,6 +25,8 @@ public class PlayActivity extends AppCompatActivity {
     private final Random random = new Random();
     private final List<PlayerState> players = new ArrayList<>();
     private final List<GameCard> biomeDeck = new ArrayList<>();
+    private final List<SpeciesRef> forageParticipants = new ArrayList<>();
+    private final List<SpeciesRef> attackParticipants = new ArrayList<>();
 
     private TextView turnLabel;
     private TextView biomeLabel;
@@ -46,6 +48,7 @@ public class PlayActivity extends AppCompatActivity {
     private int currentPlayer = 0;
     private int round = 1;
     private GameCard activeBiome;
+    private Phase currentPhase = Phase.PLAYER_ACTION;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -116,15 +119,18 @@ public class PlayActivity extends AppCompatActivity {
             players.add(state);
         }
 
+        beginPhase(Phase.PLAYER_ACTION, "Ronda 1 lista. Elige una acción: crear especie, reemplazar carta o pasar.");
         appendLog("Partida iniciada. Se generaron 3 mazos aleatorios (1 humano + 2 bots).");
     }
 
     private void endHumanTurn() {
+        beginPhase(Phase.PLAYER_ACTION, "Turno de bots: observa sus acciones.");
         currentPlayer = 1;
         runBotsUntilRoundEnds();
         resolveEndOfRound();
         currentPlayer = 0;
         round++;
+        beginPhase(Phase.PLAYER_ACTION, "Tu turno: elige una acción.");
         refreshUi();
     }
 
@@ -307,12 +313,18 @@ public class PlayActivity extends AppCompatActivity {
     }
 
     private void resolveEndOfRound() {
-        appendLog("--- Ronda " + round + ": forrajeo ---");
+        forageParticipants.clear();
+        attackParticipants.clear();
+
+        beginPhase(Phase.FORAGE, "Se reparte comida en la zona de forraje y comen por velocidad.");
         int foragePool = random.nextInt(10) + 1;
         appendLog("Zona de forraje: " + foragePool + " comida.");
 
         List<SpeciesRef> allSpecies = collectSpecies();
-        allSpecies.sort(Comparator.comparingInt((SpeciesRef ref) -> ref.species.getSpeed()).reversed());
+        allSpecies.sort(Comparator
+                .comparingInt((SpeciesRef ref) -> ref.species.getSpeed())
+                .thenComparingInt(ref -> ref.species.getTotalAttributes())
+                .reversed());
 
         for (SpeciesRef ref : allSpecies) {
             if (foragePool <= 0) {
@@ -321,17 +333,23 @@ public class PlayActivity extends AppCompatActivity {
             int gain = Math.min(Math.max(1, ref.species.getAttack()), foragePool);
             ref.species.food += gain;
             foragePool -= gain;
+            forageParticipants.add(ref);
             appendLog(ref.player.name + " forrajea +" + gain + " comida.");
         }
+        if (forageParticipants.isEmpty()) {
+            appendLog("Ninguna especie logró comer en forrajeo.");
+        }
 
-        appendLog("--- Depredación ---");
+        beginPhase(Phase.PREDATION, "Las especies con ataque intentan cazar.");
         for (SpeciesRef attackerRef : allSpecies) {
             SpeciesState attacker = attackerRef.species;
             if (attacker.getAttack() <= 0) {
                 continue;
             }
             SpeciesRef target = chooseTarget(attackerRef);
+            attackParticipants.add(attackerRef);
             if (target == null) {
+                appendLog(attackerRef.player.name + " no tiene objetivos válidos para depredar.");
                 continue;
             }
 
@@ -355,12 +373,13 @@ public class PlayActivity extends AppCompatActivity {
             }
         }
 
-        appendLog("--- Resolución y reproducción ---");
+        beginPhase(Phase.RESOLUTION, "Cada especie consume metabolismo y se resuelven bajas.");
         for (PlayerState player : players) {
             for (int i = player.species.size() - 1; i >= 0; i--) {
                 SpeciesState species = player.species.get(i);
                 int metabolism = species.getMetabolism(activeBiome);
                 species.food -= metabolism;
+                appendLog(player.name + " consume " + metabolism + " comida por metabolismo.");
 
                 if (species.health < 1 || species.food < 1) {
                     species.individuals -= 1;
@@ -375,6 +394,13 @@ public class PlayActivity extends AppCompatActivity {
                     continue;
                 }
 
+                species.health = Math.max(species.health, species.individuals);
+            }
+        }
+
+        beginPhase(Phase.REPRODUCTION, "Las especies con comida suficiente se reproducen.");
+        for (PlayerState player : players) {
+            for (SpeciesState species : player.species) {
                 int fertility = Math.max(1, species.individuals);
                 if (species.food >= fertility) {
                     species.food -= fertility;
@@ -383,14 +409,22 @@ public class PlayActivity extends AppCompatActivity {
                     player.score += 5;
                     appendLog(player.name + " reproduce una especie (+1 individuo).");
                 }
+            }
+        }
 
+        beginPhase(Phase.REPLENISHMENT, "Se reponen manos y se actualiza puntaje.");
+        for (PlayerState player : players) {
+            for (SpeciesState species : player.species) {
                 player.score += species.food;
                 player.score += species.cards.size();
             }
+            int previousHand = player.hand.size();
             player.drawTo(HAND_TARGET);
+            appendLog(player.name + " repone mano: " + previousHand + " → " + player.hand.size() + " cartas. Puntaje: " + player.score + ".");
         }
 
         maybeAdvanceBiome();
+        refreshUi();
     }
 
     private void maybeAdvanceBiome() {
@@ -415,7 +449,7 @@ public class PlayActivity extends AppCompatActivity {
             if (ref.player == attacker.player) {
                 continue;
             }
-            if (ref.species.food > 0) {
+            if (wasInForageOrAttack(ref.species)) {
                 validTargets.add(ref);
             }
         }
@@ -423,6 +457,20 @@ public class PlayActivity extends AppCompatActivity {
             return null;
         }
         return validTargets.get(random.nextInt(validTargets.size()));
+    }
+
+    private boolean wasInForageOrAttack(SpeciesState species) {
+        for (SpeciesRef ref : forageParticipants) {
+            if (ref.species == species) {
+                return true;
+            }
+        }
+        for (SpeciesRef ref : attackParticipants) {
+            if (ref.species == species) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private List<SpeciesRef> collectSpecies() {
@@ -439,6 +487,18 @@ public class PlayActivity extends AppCompatActivity {
         return "Mandíbula".equalsIgnoreCase(card.type);
     }
 
+    private void beginPhase(Phase phase, String instruction) {
+        currentPhase = phase;
+        clearLog();
+        appendLog("--- Ronda " + round + " · " + phase.label + " ---");
+        appendLog(instruction);
+        refreshUi();
+    }
+
+    private void clearLog() {
+        logLabel.setText("");
+    }
+
     private void appendLog(String message) {
         CharSequence current = logLabel.getText();
         String next = (current == null || current.length() == 0) ? message : current + "\n" + message;
@@ -446,7 +506,7 @@ public class PlayActivity extends AppCompatActivity {
     }
 
     private void refreshUi() {
-        turnLabel.setText(getString(R.string.play_hand_area_title));
+        turnLabel.setText(getString(R.string.play_turn_phase, round, currentPhase.label));
         biomeLabel.setText(getString(R.string.play_forage_zone, activeBiome == null ? "N/D" : activeBiome.name));
 
         PlayerState human = players.get(0);
@@ -591,6 +651,10 @@ public class PlayActivity extends AppCompatActivity {
             return perception;
         }
 
+        int getTotalAttributes() {
+            return getAttack() + getSpeed() + getArmor() + getPerception();
+        }
+
         int getMetabolism(GameCard biome) {
             int metabolism = Math.max(1, individuals);
             int biomeTemp = 0;
@@ -637,6 +701,21 @@ public class PlayActivity extends AppCompatActivity {
             int idx = replaceable.get(random.nextInt(replaceable.size()));
             cards.set(idx, replacement);
             return true;
+        }
+    }
+
+    private enum Phase {
+        PLAYER_ACTION("Fase del jugador"),
+        FORAGE("Fase de forrajeo"),
+        PREDATION("Fase de depredación"),
+        RESOLUTION("Fase de resolución"),
+        REPRODUCTION("Fase de reproducción"),
+        REPLENISHMENT("Fase de reposición");
+
+        final String label;
+
+        Phase(String label) {
+            this.label = label;
         }
     }
 }
