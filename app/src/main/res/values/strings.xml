@@ -17,6 +17,11 @@
     <string name="play_hand_title">Tu mano</string>
     <string name="play_species_title">Tus especies</string>
     <string name="play_scoreboard_title">Marcador</string>
+    <string name="play_bot2_deck_title">Mazo Bot 2</string>
+    <string name="play_bot1_deck_title">Mazo Bot 1</string>
+    <string name="play_bot2_species_title">Zona Bot 2</string>
+    <string name="play_bot1_species_title">Zona Bot 1</string>
+    <string name="play_log_title">Registro de acciones</string>
     <string name="play_create_species_dialog_title">Selecciona 2 cartas (incluye 1 mandíbula)</string>
     <string name="play_confirm">Confirmar</string>
     <string name="play_cancel">Cancelar</string>
