@@ -780,7 +780,7 @@ public class PlayActivity extends AppCompatActivity {
 
         title.setText(card.id + " · " + card.name);
         type.setText("Tipo: " + card.type);
-        rarity.setText("Rareza: " + (card.meta == null || card.meta.trim().isEmpty() ? "Sin dato" : card.meta));
+        rarity.setText("Rareza: " + (card.metadata == null || card.metadata.trim().isEmpty() ? "Sin dato" : card.metadata));
         description.setText("Descripción: " + (card.description == null || card.description.trim().isEmpty() ? "Sin descripción" : card.description));
 
         new AlertDialog.Builder(this)
