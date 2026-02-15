@@ -1192,11 +1192,11 @@ public class PlayActivity extends AppCompatActivity {
     }
 
     private class SpeciesState {
-        private static final Set<String> HERBIVORE_JAWS = new HashSet<>(Arrays.asList(
+        private  final Set<String> HERBIVORE_JAWS = new HashSet<>(Arrays.asList(
                 "A11", "A102", "A103", "A104", "A105", "A106", "A107", "A108",
                 "A110", "A111", "A112", "A113", "A114", "A115", "A116"
         ));
-        private static final Set<String> OMNIVORE_JAWS = new HashSet<>(Arrays.asList("A15", "A109"));
+        private  final Set<String> OMNIVORE_JAWS = new HashSet<>(Arrays.asList("A15", "A109"));
 
         final List<GameCard> cards = new ArrayList<>();
         final List<Status> statuses = new ArrayList<>();
