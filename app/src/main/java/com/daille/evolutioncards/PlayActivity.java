@@ -29,12 +29,18 @@ public class PlayActivity extends AppCompatActivity {
     private TextView turnLabel;
     private TextView biomeLabel;
     private TextView humanHandLabel;
-    private TextView humanSpeciesLabel;
+    private TextView humanSpecies1Label;
+    private TextView humanSpecies2Label;
+    private TextView humanSpecies3Label;
+    private TextView humanDeckLabel;
     private TextView bot1DeckLabel;
     private TextView bot2DeckLabel;
-    private TextView bot1SpeciesLabel;
-    private TextView bot2SpeciesLabel;
-    private TextView scoreboardLabel;
+    private TextView bot1Species1Label;
+    private TextView bot1Species2Label;
+    private TextView bot1Species3Label;
+    private TextView bot2Species1Label;
+    private TextView bot2Species2Label;
+    private TextView bot2Species3Label;
     private TextView logLabel;
 
     private int currentPlayer = 0;
@@ -52,12 +58,18 @@ public class PlayActivity extends AppCompatActivity {
         turnLabel = findViewById(R.id.turnLabel);
         biomeLabel = findViewById(R.id.biomeLabel);
         humanHandLabel = findViewById(R.id.humanHandLabel);
-        humanSpeciesLabel = findViewById(R.id.humanSpeciesLabel);
+        humanSpecies1Label = findViewById(R.id.humanSpecies1Label);
+        humanSpecies2Label = findViewById(R.id.humanSpecies2Label);
+        humanSpecies3Label = findViewById(R.id.humanSpecies3Label);
+        humanDeckLabel = findViewById(R.id.humanDeckLabel);
         bot1DeckLabel = findViewById(R.id.bot1DeckLabel);
         bot2DeckLabel = findViewById(R.id.bot2DeckLabel);
-        bot1SpeciesLabel = findViewById(R.id.bot1SpeciesLabel);
-        bot2SpeciesLabel = findViewById(R.id.bot2SpeciesLabel);
-        scoreboardLabel = findViewById(R.id.scoreboardLabel);
+        bot1Species1Label = findViewById(R.id.bot1Species1Label);
+        bot1Species2Label = findViewById(R.id.bot1Species2Label);
+        bot1Species3Label = findViewById(R.id.bot1Species3Label);
+        bot2Species1Label = findViewById(R.id.bot2Species1Label);
+        bot2Species2Label = findViewById(R.id.bot2Species2Label);
+        bot2Species3Label = findViewById(R.id.bot2Species3Label);
         logLabel = findViewById(R.id.logLabel);
 
         MaterialButton createSpeciesButton = findViewById(R.id.buttonCreateSpecies);
@@ -434,19 +446,38 @@ public class PlayActivity extends AppCompatActivity {
     }
 
     private void refreshUi() {
-        turnLabel.setText(getString(R.string.play_turn, round));
-        biomeLabel.setText(getString(R.string.play_biome, activeBiome == null ? "N/D" : activeBiome.name));
+        turnLabel.setText(getString(R.string.play_hand_area_title));
+        biomeLabel.setText(getString(R.string.play_forage_zone, activeBiome == null ? "N/D" : activeBiome.name));
 
         PlayerState human = players.get(0);
         PlayerState bot1 = players.get(1);
         PlayerState bot2 = players.get(2);
+
+        humanDeckLabel.setText(formatHumanDeck(human));
         humanHandLabel.setText(formatHand(human));
-        humanSpeciesLabel.setText(formatSpecies(human));
-        bot1DeckLabel.setText(formatDeck(bot1));
-        bot2DeckLabel.setText(formatDeck(bot2));
-        bot1SpeciesLabel.setText(formatSpecies(bot1));
-        bot2SpeciesLabel.setText(formatSpecies(bot2));
-        scoreboardLabel.setText(formatScoreboard());
+
+        humanSpecies1Label.setText(formatSpeciesAt(human, 0));
+        humanSpecies2Label.setText(formatSpeciesAt(human, 1));
+        humanSpecies3Label.setText(formatSpeciesAt(human, 2));
+
+        bot1DeckLabel.setText(formatBotDeck(bot1));
+        bot2DeckLabel.setText(formatBotDeck(bot2));
+
+        bot1Species1Label.setText(formatSpeciesAt(bot1, 0));
+        bot1Species2Label.setText(formatSpeciesAt(bot1, 1));
+        bot1Species3Label.setText(formatSpeciesAt(bot1, 2));
+
+        bot2Species1Label.setText(formatSpeciesAt(bot2, 0));
+        bot2Species2Label.setText(formatSpeciesAt(bot2, 1));
+        bot2Species3Label.setText(formatSpeciesAt(bot2, 2));
+    }
+
+    private String formatHumanDeck(PlayerState player) {
+        return String.format(Locale.US, "Mazo de\njugador\n\n%d", player.deck.size());
+    }
+
+    private String formatBotDeck(PlayerState player) {
+        return String.format(Locale.US, "Mazo de\n%s\n\n%d", player.name.toLowerCase(Locale.US), player.deck.size());
     }
 
     private String formatDeck(PlayerState player) {
@@ -464,51 +495,29 @@ public class PlayActivity extends AppCompatActivity {
             builder.append("- sin cartas");
             return builder.toString();
         }
-        for (GameCard card : player.hand) {
-            builder.append("• ").append(card.id).append(" ").append(card.name)
-                    .append(" [").append(card.type).append("]\n");
+        for (int i = 0; i < player.hand.size(); i++) {
+            GameCard card = player.hand.get(i);
+            builder.append("[").append(i + 1).append("] ")
+                    .append(card.name)
+                    .append(" (").append(card.type).append(")\n");
         }
         return builder.toString();
     }
 
-    private String formatSpecies(PlayerState player) {
-        StringBuilder builder = new StringBuilder();
-        if (player.human) {
-            builder.append(getString(R.string.play_species_title)).append("\n");
-        } else {
-            builder.append("Especies de ").append(player.name).append("\n");
+    private String formatSpeciesAt(PlayerState player, int index) {
+        if (index >= player.species.size()) {
+            return "Sin especie";
         }
-        if (player.species.isEmpty()) {
-            builder.append(player.human ? "- aún no tienes especies" : "- sin especies en juego");
-            return builder.toString();
-        }
-        for (int i = 0; i < player.species.size(); i++) {
-            SpeciesState species = player.species.get(i);
-            builder.append(String.format(Locale.US,
-                    "• Especie %d | Cartas:%d Ind:%d Com:%d Atk:%d Vel:%d Arm:%d Per:%d\n",
-                    i + 1,
-                    species.cards.size(),
-                    species.individuals,
-                    species.food,
-                    species.getAttack(),
-                    species.getSpeed(),
-                    species.getArmor(),
-                    species.getPerception()));
-        }
-        return builder.toString();
-    }
-
-    private String formatScoreboard() {
-        StringBuilder builder = new StringBuilder();
-        builder.append(getString(R.string.play_scoreboard_title)).append("\n");
-        for (PlayerState player : players) {
-            builder.append("• ").append(player.name)
-                    .append(": ").append(player.score)
-                    .append(" pts | mazo ").append(player.deck.size())
-                    .append(" | mano ").append(player.hand.size())
-                    .append("\n");
-        }
-        return builder.toString();
+        SpeciesState species = player.species.get(index);
+        return String.format(Locale.US,
+                "Fichas:%d  Ind:%d\nSalud:%d  Ataque:%d\nArmadura:%d  Vel:%d\nPercepción:%d",
+                species.cards.size(),
+                species.individuals,
+                species.health,
+                species.getAttack(),
+                species.getArmor(),
+                species.getSpeed(),
+                species.getPerception());
     }
 
     private static class SpeciesRef {
