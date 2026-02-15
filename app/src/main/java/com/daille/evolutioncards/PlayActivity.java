@@ -1,10 +1,12 @@
 package com.daille.evolutioncards;
 
 import android.os.Bundle;
+import android.graphics.Color;
 import android.text.SpannableString;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.style.ForegroundColorSpan;
+import android.text.style.StyleSpan;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -1032,15 +1034,17 @@ public class PlayActivity extends AppCompatActivity {
                 .show();
     }
 
-    private String buildSpeciesBarsText(SpeciesState species) {
-        StringBuilder builder = new StringBuilder();
-        builder.append("Salud ").append(buildBar(clamp(species.health, ATTRIBUTE_MIN, ATTRIBUTE_MAX))).append("\n");
-        builder.append("Ataque ").append(buildBar(clamp(species.getAttack(), ATTRIBUTE_MIN, ATTRIBUTE_MAX))).append("\n");
-        builder.append("Armadura ").append(buildBar(clamp(species.getArmor(), ATTRIBUTE_MIN, ATTRIBUTE_MAX))).append("\n");
-        builder.append("Velocidad ").append(buildBar(clamp(species.getSpeed(), ATTRIBUTE_MIN, ATTRIBUTE_MAX))).append("\n");
-        builder.append("Percepción ").append(buildBar(clamp(species.getPerception(), ATTRIBUTE_MIN, ATTRIBUTE_MAX))).append("\n");
-        builder.append("Metabolismo ").append(buildBar(clamp(species.getMetabolism(activeBiome), ATTRIBUTE_MIN, ATTRIBUTE_MAX)));
-        return builder.toString();
+    private CharSequence buildSpeciesBarsText(SpeciesState species) {
+        SpannableStringBuilder builder = new SpannableStringBuilder();
+        builder.append(createStatLine("Salud", species.health, 0xFF8BC34A)).append("\n");
+        builder.append(createStatLine("Ataque", species.getAttack(), 0xFFE53935)).append("\n");
+        builder.append(createStatLine("Armadura", species.getArmor(), 0xFF4FC3F7)).append("\n");
+        builder.append(createStatLine("Velocidad", species.getSpeed(), 0xFFFDD835)).append("\n");
+        builder.append(createStatLine("Percepción", species.getPerception(), 0xFFBDBDBD)).append("\n");
+        builder.append(createStatLine("Metabolismo", species.getMetabolism(activeBiome), 0xFFE6A57E)).append("\n");
+        builder.append(createStatLine("Fertilidad", species.getFertility(), 0xFFBA68C8)).append("\n");
+        builder.append(createStatLine("Temperatura", getBiomeTemperatureValue(activeBiome), 0xFFF5F5F5));
+        return builder;
     }
 
     private String buildSpeciesCardsText(SpeciesState species) {
@@ -1070,21 +1074,22 @@ public class PlayActivity extends AppCompatActivity {
         SpeciesState species = player.species.get(index);
 
         SpannableStringBuilder builder = new SpannableStringBuilder();
+        builder.append(styledHeader("Fichas de individuo")).append("\n");
         builder.append("Individuos: ");
         builder.append(createTokenDots(species.individuals, 0xFF000000));
         builder.append("\nAlimentación: ");
         builder.append(createTokenDots(species.food, 0xFF2E7D32));
         builder.append("\n\n");
 
-        appendAttributeLine(builder, "Salud", species.health);
-        appendAttributeLine(builder, "Ataque", species.getAttack());
-        appendAttributeLine(builder, "Armadura", species.getArmor());
-        appendAttributeLine(builder, "Velocidad", species.getSpeed());
-        appendAttributeLine(builder, "Percepción", species.getPerception());
-        appendAttributeLine(builder, "Metabolismo", species.getMetabolism(activeBiome));
+        appendAttributeLine(builder, "Salud", species.health, 0xFF8BC34A);
+        appendAttributeLine(builder, "Ataque", species.getAttack(), 0xFFE53935);
+        appendAttributeLine(builder, "Armadura", species.getArmor(), 0xFF4FC3F7);
+        appendAttributeLine(builder, "Velocidad", species.getSpeed(), 0xFFFDD835);
+        appendAttributeLine(builder, "Percepción", species.getPerception(), 0xFFBDBDBD);
+        appendAttributeLine(builder, "Metabolismo", species.getMetabolism(activeBiome), 0xFFE6A57E);
 
         int fertility = species.getFertility();
-        appendAttributeLine(builder, "Fertilidad", fertility);
+        appendAttributeLine(builder, "Fertilidad", fertility, 0xFFBA68C8);
 
         if (!species.statuses.isEmpty()) {
             builder.append("\nEstados: ");
@@ -1096,34 +1101,42 @@ public class PlayActivity extends AppCompatActivity {
             }
         }
 
-        appendAttributeLine(builder, "Temperatura", getBiomeTemperatureValue(activeBiome));
+        appendAttributeLine(builder, "Temperatura", getBiomeTemperatureValue(activeBiome), 0xFFF5F5F5);
         return builder;
     }
 
-    private void appendAttributeLine(SpannableStringBuilder builder, String label, int rawValue) {
-        int value = clamp(rawValue, ATTRIBUTE_MIN, ATTRIBUTE_MAX);
-        builder.append(label)
-                .append("=")
-                .append(String.valueOf(value))
-                .append(" ")
-                .append(buildBar(value));
+    private void appendAttributeLine(SpannableStringBuilder builder, String label, int rawValue, int color) {
+        builder.append(createStatLine(label, rawValue, color));
         if (!"Temperatura".contentEquals(label)) {
             builder.append("\n");
         }
     }
 
-    private int clamp(int value, int min, int max) {
-        return Math.max(min, Math.min(max, value));
+    private CharSequence createStatLine(String label, int rawValue, int color) {
+        int value = clamp(rawValue, ATTRIBUTE_MIN, ATTRIBUTE_MAX);
+        SpannableStringBuilder line = new SpannableStringBuilder();
+        int startLabel = line.length();
+        line.append(label).append("=").append(String.valueOf(value));
+        line.setSpan(new StyleSpan(android.graphics.Typeface.BOLD), startLabel, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        line.append(" ");
+
+        for (int i = 0; i < ATTRIBUTE_MAX; i++) {
+            int start = line.length();
+            line.append(i < value ? "█" : "░");
+            int textColor = i < value ? color : Color.parseColor("#607D8B");
+            line.setSpan(new ForegroundColorSpan(textColor), start, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        return line;
     }
 
-    private String buildBar(int value) {
-        StringBuilder bar = new StringBuilder(ATTRIBUTE_MAX + 2);
-        bar.append("[");
-        for (int i = 0; i < ATTRIBUTE_MAX; i++) {
-            bar.append(i < value ? "█" : "░");
-        }
-        bar.append("]");
-        return bar.toString();
+    private CharSequence styledHeader(String text) {
+        SpannableString header = new SpannableString(text);
+        header.setSpan(new StyleSpan(android.graphics.Typeface.BOLD), 0, header.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return header;
+    }
+
+    private int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private CharSequence createTokenDots(int amount, int color) {
