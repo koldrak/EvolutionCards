@@ -369,6 +369,9 @@ public class PlayActivity extends AppCompatActivity {
             appendLog("Ninguna especie logró comer en forrajeo.");
             showMessage("Ninguna especie logró comer en forrajeo.");
         }
+        if (forageParticipants.isEmpty()) {
+            appendLog("Ninguna especie logró comer en forrajeo.");
+        }
 
         beginPhase(Phase.PREDATION, "Las especies con ataque intentan cazar.");
         for (SpeciesRef attackerRef : allSpecies) {
