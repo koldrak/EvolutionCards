@@ -899,23 +899,43 @@ public class PlayActivity extends AppCompatActivity {
         humanDeckLabel.setText(formatHumanDeck(human));
         renderHumanHandSlots(human);
 
-        humanSpecies1Label.setText(formatSpeciesAt(human, 0));
-        humanSpecies2Label.setText(formatSpeciesAt(human, 1));
-        humanSpecies3Label.setText(formatSpeciesAt(human, 2));
+        renderSpeciesSlot(humanSpecies1Label, human, 0);
+        renderSpeciesSlot(humanSpecies2Label, human, 1);
+        renderSpeciesSlot(humanSpecies3Label, human, 2);
 
         if (bot1 != null) {
             bot1DeckLabel.setText(formatBotDeck(bot1));
-            bot1Species1Label.setText(formatSpeciesAt(bot1, 0));
-            bot1Species2Label.setText(formatSpeciesAt(bot1, 1));
-            bot1Species3Label.setText(formatSpeciesAt(bot1, 2));
+            renderSpeciesSlot(bot1Species1Label, bot1, 0);
+            renderSpeciesSlot(bot1Species2Label, bot1, 1);
+            renderSpeciesSlot(bot1Species3Label, bot1, 2);
         }
 
         if (bot2 != null) {
             bot2DeckLabel.setText(formatBotDeck(bot2));
-            bot2Species1Label.setText(formatSpeciesAt(bot2, 0));
-            bot2Species2Label.setText(formatSpeciesAt(bot2, 1));
-            bot2Species3Label.setText(formatSpeciesAt(bot2, 2));
+            renderSpeciesSlot(bot2Species1Label, bot2, 0);
+            renderSpeciesSlot(bot2Species2Label, bot2, 1);
+            renderSpeciesSlot(bot2Species3Label, bot2, 2);
         }
+    }
+
+    private void renderSpeciesSlot(TextView slotView, PlayerState player, int speciesIndex) {
+        slotView.setText(formatSpeciesAt(player, speciesIndex));
+        slotView.setBackgroundResource(getSpeciesBackground(player, speciesIndex));
+    }
+
+    private int getSpeciesBackground(PlayerState player, int speciesIndex) {
+        if (speciesIndex >= player.species.size()) {
+            return R.drawable.bg_species_card;
+        }
+
+        DietType dietType = player.species.get(speciesIndex).getDietType();
+        if (dietType == DietType.CARNIVORE) {
+            return R.drawable.bg_species_card_carnivore;
+        }
+        if (dietType == DietType.HERBIVORE) {
+            return R.drawable.bg_species_card_herbivore;
+        }
+        return R.drawable.bg_species_card;
     }
 
     private void setupHandInteractions() {
