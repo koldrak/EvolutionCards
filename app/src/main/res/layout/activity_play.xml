@@ -142,41 +142,13 @@
                     android:textStyle="bold" />
 
                 <LinearLayout
+                    android:id="@+id/forageTokensContainer"
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
                     android:layout_weight="1"
                     android:gravity="center"
                     android:orientation="horizontal"
-                    android:weightSum="4">
-
-                    <View
-                        android:layout_width="0dp"
-                        android:layout_height="26dp"
-                        android:layout_margin="3dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_food_token" />
-
-                    <View
-                        android:layout_width="0dp"
-                        android:layout_height="26dp"
-                        android:layout_margin="3dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_food_token" />
-
-                    <View
-                        android:layout_width="0dp"
-                        android:layout_height="26dp"
-                        android:layout_margin="3dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_food_token" />
-
-                    <View
-                        android:layout_width="0dp"
-                        android:layout_height="26dp"
-                        android:layout_margin="3dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_food_token" />
-                </LinearLayout>
+                    android:weightSum="10" />
             </LinearLayout>
 
             <LinearLayout
@@ -264,6 +236,34 @@
                         android:textSize="9sp" />
                 </LinearLayout>
 
+
+                <LinearLayout
+                    android:id="@+id/messageOverlay"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:background="@drawable/bg_board_panel"
+                    android:orientation="vertical"
+                    android:padding="6dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/messageOverlayText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/buttonContinueMessage"
+                        style="@style/Widget.MaterialComponents.Button"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="Continuar"
+                        android:textSize="10sp"
+                        app:cornerRadius="8dp" />
+                </LinearLayout>
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

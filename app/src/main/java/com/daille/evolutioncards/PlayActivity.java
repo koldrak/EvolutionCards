@@ -1,6 +1,9 @@
 package com.daille.evolutioncards;
 
 import android.os.Bundle;
+import android.util.TypedValue;
+import android.view.View;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AlertDialog;
@@ -9,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.button.MaterialButton;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -44,6 +48,13 @@ public class PlayActivity extends AppCompatActivity {
     private TextView bot2Species2Label;
     private TextView bot2Species3Label;
     private TextView logLabel;
+    private LinearLayout forageTokensContainer;
+    private LinearLayout messageOverlay;
+    private TextView messageOverlayText;
+    private MaterialButton buttonContinueMessage;
+
+    private final ArrayDeque<String> pendingMessages = new ArrayDeque<>();
+    private boolean messageVisible = false;
 
     private int currentPlayer = 0;
     private int round = 1;
@@ -74,6 +85,10 @@ public class PlayActivity extends AppCompatActivity {
         bot2Species2Label = findViewById(R.id.bot2Species2Label);
         bot2Species3Label = findViewById(R.id.bot2Species3Label);
         logLabel = findViewById(R.id.logLabel);
+        forageTokensContainer = findViewById(R.id.forageTokensContainer);
+        messageOverlay = findViewById(R.id.messageOverlay);
+        messageOverlayText = findViewById(R.id.messageOverlayText);
+        buttonContinueMessage = findViewById(R.id.buttonContinueMessage);
 
         MaterialButton createSpeciesButton = findViewById(R.id.buttonCreateSpecies);
         MaterialButton replaceCardButton = findViewById(R.id.buttonReplaceCard);
@@ -92,6 +107,8 @@ public class PlayActivity extends AppCompatActivity {
             appendLog("Humano pasa su acción.");
             endHumanTurn();
         });
+
+        buttonContinueMessage.setOnClickListener(v -> showNextPendingMessage());
 
         setupGame();
         refreshUi();
@@ -143,15 +160,21 @@ public class PlayActivity extends AppCompatActivity {
     private void runBotAction(PlayerState bot) {
         boolean created = tryCreateSpecies(bot);
         if (created) {
-            appendLog(bot.name + " crea una nueva especie.");
+            String msg = bot.name + " crea una nueva especie.";
+            appendLog(msg);
+            showMessage(msg);
             return;
         }
         boolean replaced = tryReplaceCard(bot);
         if (replaced) {
-            appendLog(bot.name + " reemplaza una carta de adaptación.");
+            String msg = bot.name + " reemplaza una carta de adaptación.";
+            appendLog(msg);
+            showMessage(msg);
             return;
         }
-        appendLog(bot.name + " pasa su acción.");
+        String msg = bot.name + " pasa su acción.";
+        appendLog(msg);
+        showMessage(msg);
     }
 
     private void humanActionCreateSpecies() {
@@ -318,7 +341,10 @@ public class PlayActivity extends AppCompatActivity {
 
         beginPhase(Phase.FORAGE, "Se reparte comida en la zona de forraje y comen por velocidad.");
         int foragePool = random.nextInt(10) + 1;
-        appendLog("Zona de forraje: " + foragePool + " comida.");
+        renderForageTokens(foragePool);
+        String diceMessage = "Resultado del dado: " + foragePool + ". Se agregan fichas de alimento a la zona de forraje.";
+        appendLog(diceMessage);
+        showMessage(diceMessage);
 
         List<SpeciesRef> allSpecies = collectSpecies();
         allSpecies.sort(Comparator
@@ -334,7 +360,14 @@ public class PlayActivity extends AppCompatActivity {
             ref.species.food += gain;
             foragePool -= gain;
             forageParticipants.add(ref);
-            appendLog(ref.player.name + " forrajea +" + gain + " comida.");
+            renderForageTokens(foragePool);
+            String feedMessage = ref.player.name + " forrajea +" + gain + " comida (quedan " + foragePool + ").";
+            appendLog(feedMessage);
+            showMessage(feedMessage);
+        }
+        if (forageParticipants.isEmpty()) {
+            appendLog("Ninguna especie logró comer en forrajeo.");
+            showMessage("Ninguna especie logró comer en forrajeo.");
         }
         if (forageParticipants.isEmpty()) {
             appendLog("Ninguna especie logró comer en forrajeo.");
@@ -349,7 +382,9 @@ public class PlayActivity extends AppCompatActivity {
             SpeciesRef target = chooseTarget(attackerRef);
             attackParticipants.add(attackerRef);
             if (target == null) {
-                appendLog(attackerRef.player.name + " no tiene objetivos válidos para depredar.");
+                String noTargetMessage = attackerRef.player.name + " no tiene objetivos válidos para depredar.";
+                appendLog(noTargetMessage);
+                showMessage(noTargetMessage);
                 continue;
             }
 
@@ -367,9 +402,13 @@ public class PlayActivity extends AppCompatActivity {
                 target.species.health -= damage;
                 attacker.food += attacker.getAttack();
                 attackerRef.player.score += attacker.getAttack();
-                appendLog(attackerRef.player.name + " depreda a " + target.player.name + " por " + damage + " de daño.");
+                String attackMessage = attackerRef.player.name + " depreda a " + target.player.name + " por " + damage + " de daño.";
+                appendLog(attackMessage);
+                showMessage(attackMessage);
             } else {
-                appendLog(attackerRef.player.name + " falla ataque sobre " + target.player.name + ".");
+                String failMessage = attackerRef.player.name + " falla ataque sobre " + target.player.name + ".";
+                appendLog(failMessage);
+                showMessage(failMessage);
             }
         }
 
@@ -492,11 +531,57 @@ public class PlayActivity extends AppCompatActivity {
         clearLog();
         appendLog("--- Ronda " + round + " · " + phase.label + " ---");
         appendLog(instruction);
+        showMessage(phase.label + ": " + instruction);
+        if (phase != Phase.FORAGE) {
+            renderForageTokens(0);
+        }
         refreshUi();
     }
 
     private void clearLog() {
         logLabel.setText("");
+    }
+
+    private void showMessage(String message) {
+        pendingMessages.add(message);
+        if (!messageVisible) {
+            showNextPendingMessage();
+        }
+    }
+
+    private void showNextPendingMessage() {
+        String nextMessage = pendingMessages.poll();
+        if (nextMessage == null) {
+            messageVisible = false;
+            messageOverlay.setVisibility(View.GONE);
+            return;
+        }
+        messageVisible = true;
+        messageOverlayText.setText(nextMessage);
+        messageOverlay.setVisibility(View.VISIBLE);
+    }
+
+    private void renderForageTokens(int tokenCount) {
+        if (forageTokensContainer == null) {
+            return;
+        }
+        forageTokensContainer.removeAllViews();
+        for (int i = 0; i < tokenCount; i++) {
+            View tokenView = new View(this);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dpToPx(22), 1f);
+            params.setMargins(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2));
+            tokenView.setLayoutParams(params);
+            tokenView.setBackgroundResource(R.drawable.bg_food_token);
+            forageTokensContainer.addView(tokenView);
+        }
+    }
+
+    private int dpToPx(int dp) {
+        return (int) TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP,
+                dp,
+                getResources().getDisplayMetrics()
+        );
     }
 
     private void appendLog(String message) {
