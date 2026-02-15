@@ -14,10 +14,14 @@ import com.google.android.material.button.MaterialButton;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Random;
 
 public class PlayActivity extends AppCompatActivity {
@@ -356,12 +360,15 @@ public class PlayActivity extends AppCompatActivity {
             if (foragePool <= 0) {
                 break;
             }
+            if (!ref.species.canForage()) {
+                continue;
+            }
             int gain = Math.min(Math.max(1, ref.species.getAttack()), foragePool);
             ref.species.food += gain;
             foragePool -= gain;
             forageParticipants.add(ref);
             renderForageTokens(foragePool);
-            String feedMessage = ref.player.name + " forrajea +" + gain + " comida (quedan " + foragePool + ").";
+            String feedMessage = getSpeciesLabel(ref) + " forrajea +" + gain + " comida (quedan " + foragePool + ").";
             appendLog(feedMessage);
             showMessage(feedMessage);
         }
@@ -373,37 +380,34 @@ public class PlayActivity extends AppCompatActivity {
         beginPhase(Phase.PREDATION, "Las especies con ataque intentan cazar.");
         for (SpeciesRef attackerRef : allSpecies) {
             SpeciesState attacker = attackerRef.species;
-            if (attacker.getAttack() <= 0) {
+            if (!attacker.canAttack()) {
                 continue;
             }
             SpeciesRef target = chooseTarget(attackerRef);
             attackParticipants.add(attackerRef);
             if (target == null) {
-                String noTargetMessage = attackerRef.player.name + " no tiene objetivos válidos para depredar.";
+                String noTargetMessage = getSpeciesLabel(attackerRef) + " no tiene objetivos válidos para depredar.";
                 appendLog(noTargetMessage);
                 showMessage(noTargetMessage);
                 continue;
             }
 
-            int attackerAwareness = attacker.getPerception();
-            int defenderAwareness = target.species.getPerception();
-            boolean attackSuccess;
-            if (attackerAwareness > defenderAwareness) {
-                attackSuccess = random.nextBoolean() || attacker.getSpeed() >= target.species.getSpeed();
-            } else {
-                attackSuccess = attacker.getSpeed() > target.species.getSpeed();
-            }
-
-            if (attackSuccess) {
-                int damage = Math.max(1, attacker.getAttack() - (target.species.getArmor() / 2));
-                target.species.health -= damage;
+            AttackResolution resolution = resolveAttack(attackerRef, target);
+            if (resolution.success) {
+                target.species.health -= resolution.damage;
                 attacker.food += attacker.getAttack();
                 attackerRef.player.score += attacker.getAttack();
-                String attackMessage = attackerRef.player.name + " depreda a " + target.player.name + " por " + damage + " de daño.";
+                String attackMessage = getSpeciesLabel(attackerRef)
+                        + " ataca por " + resolution.modeLabel + " a " + getSpeciesLabel(target)
+                        + ". Resultado ataque exitoso " + getSpeciesLabel(target)
+                        + " pierde " + resolution.damage + " de salud y "
+                        + getSpeciesLabel(attackerRef) + " recibe " + attacker.getAttack() + " fichas de comida.";
                 appendLog(attackMessage);
                 showMessage(attackMessage);
             } else {
-                String failMessage = attackerRef.player.name + " falla ataque sobre " + target.player.name + ".";
+                String failMessage = getSpeciesLabel(attackerRef)
+                        + " ataca por " + resolution.modeLabel + " a " + getSpeciesLabel(target)
+                        + ". Resultado ataque fallido.";
                 appendLog(failMessage);
                 showMessage(failMessage);
             }
@@ -502,7 +506,7 @@ public class PlayActivity extends AppCompatActivity {
     private SpeciesRef chooseTarget(SpeciesRef attacker) {
         List<SpeciesRef> validTargets = new ArrayList<>();
         for (SpeciesRef ref : collectSpecies()) {
-            if (ref.player == attacker.player) {
+            if (ref.species == attacker.species) {
                 continue;
             }
             if (wasInForageOrAttack(ref.species)) {
@@ -512,7 +516,64 @@ public class PlayActivity extends AppCompatActivity {
         if (validTargets.isEmpty()) {
             return null;
         }
+        TargetRule rule = attacker.species.getTargetRule();
+        return chooseTargetByRule(validTargets, rule);
+    }
+
+
+    private SpeciesRef chooseTargetByRule(List<SpeciesRef> validTargets, TargetRule rule) {
+        if (rule == TargetRule.HIGHEST_ARMOR) {
+            return validTargets.stream()
+                    .max(Comparator.comparingInt(ref -> ref.species.getArmor()))
+                    .orElse(validTargets.get(random.nextInt(validTargets.size())));
+        }
+        if (rule == TargetRule.LOWEST_SPEED) {
+            return validTargets.stream()
+                    .min(Comparator.comparingInt((SpeciesRef ref) -> ref.species.getSpeed())
+                            .thenComparingInt(ref -> ref.species.getTotalAttributes()))
+                    .orElse(validTargets.get(random.nextInt(validTargets.size())));
+        }
+        if (rule == TargetRule.LOWEST_PERCEPTION) {
+            return validTargets.stream()
+                    .min(Comparator.comparingInt((SpeciesRef ref) -> ref.species.getPerception())
+                            .thenComparingInt(ref -> ref.species.getTotalAttributes()))
+                    .orElse(validTargets.get(random.nextInt(validTargets.size())));
+        }
+        if (rule == TargetRule.LOWEST_DEFENSE) {
+            return validTargets.stream()
+                    .min(Comparator.comparingInt((SpeciesRef ref) -> ref.species.getArmor())
+                            .thenComparingInt(ref -> ref.species.getTotalAttributes()))
+                    .orElse(validTargets.get(random.nextInt(validTargets.size())));
+        }
         return validTargets.get(random.nextInt(validTargets.size()));
+    }
+
+    private String getSpeciesLabel(SpeciesRef ref) {
+        int index = ref.player.species.indexOf(ref.species);
+        return "Especie " + (index + 1) + " de " + ref.player.name;
+    }
+
+    private AttackResolution resolveAttack(SpeciesRef attackerRef, SpeciesRef defenderRef) {
+        SpeciesState attacker = attackerRef.species;
+        SpeciesState defender = defenderRef.species;
+        String modeLabel;
+        boolean success;
+
+        if (attacker.getPerception() > defender.getPerception()) {
+            if (random.nextBoolean()) {
+                modeLabel = "emboscada";
+                success = true;
+            } else {
+                modeLabel = "huida con ventaja";
+                success = attacker.getSpeed() > defender.getSpeed() + 2;
+            }
+        } else {
+            modeLabel = "huida";
+            success = attacker.getSpeed() > defender.getSpeed();
+        }
+
+        int damage = success ? Math.max(0, attacker.getAttack() - (defender.getArmor() / 2)) : 0;
+        return new AttackResolution(modeLabel, success, damage);
     }
 
     private boolean wasInForageOrAttack(SpeciesState species) {
@@ -708,10 +769,72 @@ public class PlayActivity extends AppCompatActivity {
     }
 
     private static class SpeciesState {
+        private static final Set<String> HERBIVORE_JAWS = new HashSet<>(Arrays.asList(
+                "A11", "A102", "A103", "A104", "A105", "A106", "A107", "A108",
+                "A110", "A111", "A112", "A113", "A114", "A115", "A116"
+        ));
+        private static final Set<String> OMNIVORE_JAWS = new HashSet<>(Arrays.asList("A15", "A109"));
+
         final List<GameCard> cards = new ArrayList<>();
         int individuals;
         int food;
         int health;
+
+        DietType getDietType() {
+            boolean hasCarnivoreJaw = false;
+            boolean hasHerbivoreJaw = false;
+            boolean hasOmnivoreJaw = false;
+            for (GameCard card : cards) {
+                if (!"Mandíbula".equalsIgnoreCase(card.type)) {
+                    continue;
+                }
+                String id = card.id == null ? "" : card.id.toUpperCase(Locale.US);
+                if (OMNIVORE_JAWS.contains(id)) {
+                    hasOmnivoreJaw = true;
+                } else if (HERBIVORE_JAWS.contains(id)) {
+                    hasHerbivoreJaw = true;
+                } else {
+                    hasCarnivoreJaw = true;
+                }
+            }
+
+            if (hasOmnivoreJaw || (hasCarnivoreJaw && hasHerbivoreJaw)) {
+                return DietType.OMNIVORE;
+            }
+            if (hasCarnivoreJaw) {
+                return DietType.CARNIVORE;
+            }
+            return DietType.HERBIVORE;
+        }
+
+        boolean canForage() {
+            return getDietType() != DietType.CARNIVORE;
+        }
+
+        boolean canAttack() {
+            return getAttack() > 0 && getDietType() != DietType.HERBIVORE;
+        }
+
+        TargetRule getTargetRule() {
+            String jawId = getPrimaryJawId();
+            if (jawId == null) {
+                return TargetRule.RANDOM;
+            }
+            Map<String, TargetRule> rules = JawTargetRules.RULES;
+            if (rules.containsKey(jawId)) {
+                return rules.get(jawId);
+            }
+            return TargetRule.RANDOM;
+        }
+
+        private String getPrimaryJawId() {
+            for (GameCard card : cards) {
+                if ("Mandíbula".equalsIgnoreCase(card.type)) {
+                    return card.id == null ? null : card.id.toUpperCase(Locale.US);
+                }
+            }
+            return null;
+        }
 
         int getAttack() {
             int base = 0;
@@ -804,6 +927,53 @@ public class PlayActivity extends AppCompatActivity {
             cards.set(idx, replacement);
             return true;
         }
+    }
+
+    private static class JawTargetRules {
+        static final Map<String, TargetRule> RULES = new java.util.HashMap<>();
+
+        static {
+            RULES.put("A1", TargetRule.LOWEST_SPEED);
+            RULES.put("A2", TargetRule.HIGHEST_ARMOR);
+            RULES.put("A3", TargetRule.LOWEST_SPEED);
+            RULES.put("A4", TargetRule.LOWEST_SPEED);
+            RULES.put("A5", TargetRule.LOWEST_PERCEPTION);
+            RULES.put("A6", TargetRule.LOWEST_PERCEPTION);
+            RULES.put("A7", TargetRule.LOWEST_PERCEPTION);
+            RULES.put("A8", TargetRule.LOWEST_SPEED);
+            RULES.put("A9", TargetRule.LOWEST_PERCEPTION);
+            RULES.put("A10", TargetRule.LOWEST_SPEED);
+            RULES.put("A12", TargetRule.LOWEST_PERCEPTION);
+            RULES.put("A13", TargetRule.LOWEST_PERCEPTION);
+            RULES.put("A14", TargetRule.LOWEST_DEFENSE);
+            RULES.put("A15", TargetRule.LOWEST_DEFENSE);
+        }
+    }
+
+    private static class AttackResolution {
+        final String modeLabel;
+        final boolean success;
+        final int damage;
+
+        AttackResolution(String modeLabel, boolean success, int damage) {
+            this.modeLabel = modeLabel;
+            this.success = success;
+            this.damage = damage;
+        }
+    }
+
+    private enum TargetRule {
+        LOWEST_SPEED,
+        HIGHEST_ARMOR,
+        LOWEST_PERCEPTION,
+        LOWEST_DEFENSE,
+        RANDOM
+    }
+
+    private enum DietType {
+        HERBIVORE,
+        CARNIVORE,
+        OMNIVORE
     }
 
     private enum Phase {
