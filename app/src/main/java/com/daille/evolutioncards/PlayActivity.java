@@ -652,8 +652,9 @@ public class PlayActivity extends AppCompatActivity {
         forageTokensContainer.removeAllViews();
         for (int i = 0; i < tokenCount; i++) {
             View tokenView = new View(this);
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dpToPx(22), 1f);
-            params.setMargins(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2));
+            int tokenSize = dpToPx(14);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(tokenSize, tokenSize);
+            params.setMargins(dpToPx(3), dpToPx(3), dpToPx(3), dpToPx(3));
             tokenView.setLayoutParams(params);
             tokenView.setBackgroundResource(R.drawable.bg_food_token);
             forageTokensContainer.addView(tokenView);
