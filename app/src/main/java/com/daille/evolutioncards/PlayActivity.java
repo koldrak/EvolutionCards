@@ -480,14 +480,6 @@ public class PlayActivity extends AppCompatActivity {
         return String.format(Locale.US, "Mazo de\n%s\n\n%d", player.name.toLowerCase(Locale.US), player.deck.size());
     }
 
-    private String formatDeck(PlayerState player) {
-        return String.format(Locale.US, "%s\n• Mazo: %d\n• Mano: %d\n• Puntos: %d",
-                player.name,
-                player.deck.size(),
-                player.hand.size(),
-                player.score);
-    }
-
     private String formatHand(PlayerState player) {
         StringBuilder builder = new StringBuilder();
         builder.append(getString(R.string.play_hand_title)).append("\n");
@@ -497,9 +489,11 @@ public class PlayActivity extends AppCompatActivity {
         }
         for (int i = 0; i < player.hand.size(); i++) {
             GameCard card = player.hand.get(i);
-            builder.append("[").append(i + 1).append("] ")
-                    .append(card.name)
-                    .append(" (").append(card.type).append(")\n");
+            String compactName = card.name.length() > 16 ? card.name.substring(0, 16) + "…" : card.name;
+            builder.append(i + 1)
+                    .append(") ")
+                    .append(compactName)
+                    .append("\n");
         }
         return builder.toString();
     }
@@ -510,13 +504,13 @@ public class PlayActivity extends AppCompatActivity {
         }
         SpeciesState species = player.species.get(index);
         return String.format(Locale.US,
-                "Fichas:%d  Ind:%d\nSalud:%d  Ataque:%d\nArmadura:%d  Vel:%d\nPercepción:%d",
+                "F:%d I:%d H:%d\nAT:%d VE:%d\nAR:%d PE:%d",
                 species.cards.size(),
                 species.individuals,
                 species.health,
                 species.getAttack(),
-                species.getArmor(),
                 species.getSpeed(),
+                species.getArmor(),
                 species.getPerception());
     }
 
