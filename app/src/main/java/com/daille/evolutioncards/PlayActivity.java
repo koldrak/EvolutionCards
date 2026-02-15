@@ -584,7 +584,6 @@ public class PlayActivity extends AppCompatActivity {
         }
 
         beginPhase(nextPhase.phase, nextPhase.instruction);
-        showMessage("Pulsa continuar para resolver esta fase.");
         onMessagesDrained = () -> {
             nextPhase.resolver.run();
             refreshUi();
