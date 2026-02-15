@@ -1127,6 +1127,9 @@ public class PlayActivity extends AppCompatActivity {
         }
         StringBuilder builder = new StringBuilder();
         for (GameCard card : species.cards) {
+            CardDesignDetails.DesignCardInfo designInfo = CardDesignDetails.findByGameCard(card);
+            String statsText = buildStatsText(designInfo);
+            String abilityText = buildAbilityText(designInfo);
             builder.append("• ")
                     .append(card.id)
                     .append(" · ")
@@ -1136,6 +1139,12 @@ public class PlayActivity extends AppCompatActivity {
                     .append(")\n")
                     .append("   ")
                     .append(card.description)
+                    .append("\n")
+                    .append("   Estadísticas: ")
+                    .append(statsText.isEmpty() ? "No modifica estadísticas." : statsText)
+                    .append("\n")
+                    .append("   Habilidad: ")
+                    .append(abilityText)
                     .append("\n");
         }
         return builder.toString().trim();
