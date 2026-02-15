@@ -369,9 +369,6 @@ public class PlayActivity extends AppCompatActivity {
             appendLog("Ninguna especie logró comer en forrajeo.");
             showMessage("Ninguna especie logró comer en forrajeo.");
         }
-        if (forageParticipants.isEmpty()) {
-            appendLog("Ninguna especie logró comer en forrajeo.");
-        }
 
         beginPhase(Phase.PREDATION, "Las especies con ataque intentan cazar.");
         for (SpeciesRef attackerRef : allSpecies) {
@@ -416,20 +413,37 @@ public class PlayActivity extends AppCompatActivity {
         for (PlayerState player : players) {
             for (int i = player.species.size() - 1; i >= 0; i--) {
                 SpeciesState species = player.species.get(i);
+                String speciesName = "Especie " + (i + 1) + " de " + player.name;
                 int metabolism = species.getMetabolism(activeBiome);
                 species.food -= metabolism;
-                appendLog(player.name + " consume " + metabolism + " comida por metabolismo.");
+                appendLog(speciesName + " consume " + metabolism + " comida por metabolismo.");
 
-                if (species.health < 1 || species.food < 1) {
+                boolean starvation = species.food < 1;
+                boolean lowHealth = species.health < 1;
+                if (lowHealth || starvation) {
                     species.individuals -= 1;
                     species.food = Math.max(0, species.food);
                     species.health = Math.max(1, species.individuals);
-                    appendLog(player.name + " pierde 1 individuo por daño/hambre.");
+                    String lossMessage;
+                    if (starvation) {
+                        lossMessage = speciesName + " pierde 1 individuo por falta de alimentación.";
+                    } else {
+                        lossMessage = speciesName + " pierde 1 individuo por daño.";
+                    }
+                    appendLog(lossMessage);
+                    showMessage(lossMessage);
                 }
 
                 if (species.individuals < 1) {
                     player.species.remove(i);
-                    appendLog(player.name + " pierde una especie (extinta).");
+                    String extinctionMessage;
+                    if (starvation) {
+                        extinctionMessage = speciesName + " falleció por falta de alimentación.";
+                    } else {
+                        extinctionMessage = speciesName + " se extinguió por daño acumulado.";
+                    }
+                    appendLog(extinctionMessage);
+                    showMessage(extinctionMessage);
                     continue;
                 }
 
@@ -439,14 +453,17 @@ public class PlayActivity extends AppCompatActivity {
 
         beginPhase(Phase.REPRODUCTION, "Las especies con comida suficiente se reproducen.");
         for (PlayerState player : players) {
-            for (SpeciesState species : player.species) {
+            for (int i = 0; i < player.species.size(); i++) {
+                SpeciesState species = player.species.get(i);
                 int fertility = Math.max(1, species.individuals);
                 if (species.food >= fertility) {
                     species.food -= fertility;
                     species.individuals += 1;
                     species.health = Math.max(species.health, species.individuals);
                     player.score += 5;
-                    appendLog(player.name + " reproduce una especie (+1 individuo).");
+                    String reproductionMessage = "Especie " + (i + 1) + " de " + player.name + " se reprodujo (+1 individuo).";
+                    appendLog(reproductionMessage);
+                    showMessage(reproductionMessage);
                 }
             }
         }
