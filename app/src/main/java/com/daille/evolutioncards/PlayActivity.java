@@ -139,8 +139,7 @@ public class PlayActivity extends AppCompatActivity {
             if (gameOver) {
                 return;
             }
-            humanActionReplaceCard();
-            endHumanTurn();
+            showReplaceCardDialog();
         });
 
         passButton.setOnClickListener(v -> {
@@ -321,12 +320,127 @@ public class PlayActivity extends AppCompatActivity {
                 .show();
     }
 
-    private void humanActionReplaceCard() {
-        if (!tryReplaceCard(players.get(0))) {
-            appendLog("No se pudo reemplazar carta (requiere especie con carta no mandíbula y carta de mano no mandíbula).");
-        } else {
-            appendLog("Humano reemplaza una carta en una especie.");
+    private void showReplaceCardDialog() {
+        PlayerState human = players.get(0);
+        if (human.hand.isEmpty() || human.species.isEmpty()) {
+            appendLog("No se pudo reemplazar carta (requiere especie y cartas en mano).");
+            endHumanTurn();
+            return;
         }
+
+        List<GameCard> handCandidates = new ArrayList<>();
+        for (GameCard card : human.hand) {
+            if (!isJaw(card)) {
+                handCandidates.add(card);
+            }
+        }
+        if (handCandidates.isEmpty()) {
+            appendLog("No se pudo reemplazar carta (requiere carta de mano no mandíbula).");
+            endHumanTurn();
+            return;
+        }
+
+        CharSequence[] handLabels = new CharSequence[handCandidates.size()];
+        for (int i = 0; i < handCandidates.size(); i++) {
+            GameCard card = handCandidates.get(i);
+            handLabels[i] = card.id + " · " + card.name + " [" + card.type + "]";
+        }
+
+        final int[] selectedHandCardIndex = {-1};
+        new AlertDialog.Builder(this)
+                .setTitle("Selecciona la carta de tu mano")
+                .setSingleChoiceItems(handLabels, -1, (dialog, which) -> selectedHandCardIndex[0] = which)
+                .setNegativeButton(R.string.play_cancel, null)
+                .setPositiveButton(R.string.play_confirm, (dialog, which) -> {
+                    if (selectedHandCardIndex[0] < 0) {
+                        appendLog("Debes seleccionar una carta de tu mano para reemplazar.");
+                        return;
+                    }
+                    GameCard selectedCard = handCandidates.get(selectedHandCardIndex[0]);
+                    showReplaceSpeciesDialog(human, selectedCard);
+                })
+                .show();
+    }
+
+    private void showReplaceSpeciesDialog(PlayerState human, GameCard selectedCard) {
+        CharSequence[] speciesLabels = new CharSequence[human.species.size()];
+        for (int i = 0; i < human.species.size(); i++) {
+            SpeciesState species = human.species.get(i);
+            speciesLabels[i] = "Especie " + (i + 1)
+                    + " (no mandíbula: " + species.getNonJawCardCount()
+                    + "/" + species.individuals + " individuos)";
+        }
+
+        final int[] selectedSpeciesIndex = {-1};
+        new AlertDialog.Builder(this)
+                .setTitle("Selecciona la especie objetivo")
+                .setSingleChoiceItems(speciesLabels, -1, (dialog, which) -> selectedSpeciesIndex[0] = which)
+                .setNegativeButton(R.string.play_cancel, null)
+                .setPositiveButton(R.string.play_confirm, (dialog, which) -> {
+                    if (selectedSpeciesIndex[0] < 0) {
+                        appendLog("Debes seleccionar una especie.");
+                        return;
+                    }
+
+                    SpeciesState targetSpecies = human.species.get(selectedSpeciesIndex[0]);
+                    if (targetSpecies.getNonJawCardCount() < targetSpecies.individuals) {
+                        targetSpecies.addCard(selectedCard, random);
+                        applyOnPlayCardEffects(human, targetSpecies, selectedCard);
+                        human.hand.remove(selectedCard);
+                        appendLog("Humano agrega una carta a la especie " + (selectedSpeciesIndex[0] + 1) + ".");
+                        endHumanTurn();
+                        return;
+                    }
+
+                    showReplaceTargetCardDialog(human, selectedCard, selectedSpeciesIndex[0], targetSpecies);
+                })
+                .show();
+    }
+
+    private void showReplaceTargetCardDialog(PlayerState human, GameCard selectedCard, int speciesIndex, SpeciesState targetSpecies) {
+        List<Integer> replaceableIndexes = new ArrayList<>();
+        List<GameCard> replaceableCards = new ArrayList<>();
+        for (int i = 0; i < targetSpecies.cards.size(); i++) {
+            GameCard card = targetSpecies.cards.get(i);
+            if (!isJaw(card)) {
+                replaceableIndexes.add(i);
+                replaceableCards.add(card);
+            }
+        }
+        if (replaceableCards.isEmpty()) {
+            appendLog("No se pudo reemplazar carta (la especie seleccionada no tiene cartas no mandíbula).");
+            endHumanTurn();
+            return;
+        }
+
+        CharSequence[] replaceLabels = new CharSequence[replaceableCards.size()];
+        for (int i = 0; i < replaceableCards.size(); i++) {
+            GameCard card = replaceableCards.get(i);
+            replaceLabels[i] = card.id + " · " + card.name + " [" + card.type + "]";
+        }
+
+        final int[] selectedReplaceIndex = {-1};
+        new AlertDialog.Builder(this)
+                .setTitle("Selecciona la carta a reemplazar")
+                .setSingleChoiceItems(replaceLabels, -1, (dialog, which) -> selectedReplaceIndex[0] = which)
+                .setNegativeButton(R.string.play_cancel, null)
+                .setPositiveButton(R.string.play_confirm, (dialog, which) -> {
+                    if (selectedReplaceIndex[0] < 0) {
+                        appendLog("Debes seleccionar una carta a reemplazar.");
+                        return;
+                    }
+
+                    int cardIndex = replaceableIndexes.get(selectedReplaceIndex[0]);
+                    if (!targetSpecies.replaceNonJawAt(cardIndex, selectedCard, random)) {
+                        appendLog("No se pudo completar el reemplazo en la especie seleccionada.");
+                        endHumanTurn();
+                        return;
+                    }
+                    human.hand.remove(selectedCard);
+                    appendLog("Humano reemplaza una carta en la especie " + (speciesIndex + 1) + ".");
+                    endHumanTurn();
+                })
+                .show();
     }
 
     private void humanActionDiscardHand() {
@@ -1559,6 +1673,20 @@ public class PlayActivity extends AppCompatActivity {
             }
             int idx = replaceable.get(random.nextInt(replaceable.size()));
             GameCard removed = cards.remove(idx);
+            unregisterTemperatureChoice(removed);
+            addCard(replacement, random);
+            return true;
+        }
+
+        boolean replaceNonJawAt(int cardIndex, GameCard replacement, Random random) {
+            if (cardIndex < 0 || cardIndex >= cards.size()) {
+                return false;
+            }
+            GameCard existing = cards.get(cardIndex);
+            if ("Mandíbula".equalsIgnoreCase(existing.type)) {
+                return false;
+            }
+            GameCard removed = cards.remove(cardIndex);
             unregisterTemperatureChoice(removed);
             addCard(replacement, random);
             return true;
