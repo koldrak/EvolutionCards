@@ -6,6 +6,7 @@ import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.style.ForegroundColorSpan;
 import android.util.TypedValue;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -44,7 +45,6 @@ public class PlayActivity extends AppCompatActivity {
 
     private TextView turnLabel;
     private TextView biomeLabel;
-    private TextView humanHandLabel;
     private TextView humanSpecies1Label;
     private TextView humanSpecies2Label;
     private TextView humanSpecies3Label;
@@ -62,6 +62,7 @@ public class PlayActivity extends AppCompatActivity {
     private LinearLayout messageOverlay;
     private TextView messageOverlayText;
     private MaterialButton buttonContinueMessage;
+    private TextView[] humanHandCardViews;
 
     private final ArrayDeque<String> pendingMessages = new ArrayDeque<>();
     private boolean messageVisible = false;
@@ -81,7 +82,6 @@ public class PlayActivity extends AppCompatActivity {
 
         turnLabel = findViewById(R.id.turnLabel);
         biomeLabel = findViewById(R.id.biomeLabel);
-        humanHandLabel = findViewById(R.id.humanHandLabel);
         humanSpecies1Label = findViewById(R.id.humanSpecies1Label);
         humanSpecies2Label = findViewById(R.id.humanSpecies2Label);
         humanSpecies3Label = findViewById(R.id.humanSpecies3Label);
@@ -99,6 +99,13 @@ public class PlayActivity extends AppCompatActivity {
         messageOverlay = findViewById(R.id.messageOverlay);
         messageOverlayText = findViewById(R.id.messageOverlayText);
         buttonContinueMessage = findViewById(R.id.buttonContinueMessage);
+        humanHandCardViews = new TextView[]{
+                findViewById(R.id.humanHandCard1),
+                findViewById(R.id.humanHandCard2),
+                findViewById(R.id.humanHandCard3),
+                findViewById(R.id.humanHandCard4),
+                findViewById(R.id.humanHandCard5)
+        };
 
         MaterialButton createSpeciesButton = findViewById(R.id.buttonCreateSpecies);
         MaterialButton replaceCardButton = findViewById(R.id.buttonReplaceCard);
@@ -119,6 +126,9 @@ public class PlayActivity extends AppCompatActivity {
         });
 
         buttonContinueMessage.setOnClickListener(v -> showNextPendingMessage());
+
+        setupHandInteractions();
+        setupSpeciesInteractions();
 
         setupGame();
         refreshUi();
@@ -684,7 +694,7 @@ public class PlayActivity extends AppCompatActivity {
         PlayerState bot2 = players.get(2);
 
         humanDeckLabel.setText(formatHumanDeck(human));
-        humanHandLabel.setText(formatHand(human));
+        renderHumanHandSlots(human);
 
         humanSpecies1Label.setText(formatSpeciesAt(human, 0));
         humanSpecies2Label.setText(formatSpeciesAt(human, 1));
@@ -702,6 +712,42 @@ public class PlayActivity extends AppCompatActivity {
         bot2Species3Label.setText(formatSpeciesAt(bot2, 2));
     }
 
+    private void setupHandInteractions() {
+        for (int i = 0; i < humanHandCardViews.length; i++) {
+            TextView cardView = humanHandCardViews[i];
+            final int cardIndex = i;
+            cardView.setOnClickListener(v -> {
+                PlayerState human = players.get(0);
+                if (cardIndex >= human.hand.size()) {
+                    return;
+                }
+                showCardDetailPanel(human.hand.get(cardIndex));
+            });
+        }
+    }
+
+    private void setupSpeciesInteractions() {
+        setupSpeciesClick(humanSpecies1Label, 0, 0);
+        setupSpeciesClick(humanSpecies2Label, 0, 1);
+        setupSpeciesClick(humanSpecies3Label, 0, 2);
+        setupSpeciesClick(bot1Species1Label, 1, 0);
+        setupSpeciesClick(bot1Species2Label, 1, 1);
+        setupSpeciesClick(bot1Species3Label, 1, 2);
+        setupSpeciesClick(bot2Species1Label, 2, 0);
+        setupSpeciesClick(bot2Species2Label, 2, 1);
+        setupSpeciesClick(bot2Species3Label, 2, 2);
+    }
+
+    private void setupSpeciesClick(TextView view, int playerIndex, int speciesIndex) {
+        view.setOnClickListener(v -> {
+            PlayerState player = players.get(playerIndex);
+            if (speciesIndex >= player.species.size()) {
+                return;
+            }
+            showSpeciesDetailPanel(player, speciesIndex, player.species.get(speciesIndex));
+        });
+    }
+
     private String formatHumanDeck(PlayerState player) {
         return String.format(Locale.US, "Mazo de\njugador\n\n%d", player.deck.size());
     }
@@ -710,22 +756,88 @@ public class PlayActivity extends AppCompatActivity {
         return String.format(Locale.US, "Mazo de\n%s\n\n%d", player.name.toLowerCase(Locale.US), player.deck.size());
     }
 
-    private String formatHand(PlayerState player) {
-        StringBuilder builder = new StringBuilder();
-        builder.append(getString(R.string.play_hand_title)).append("\n");
-        if (player.hand.isEmpty()) {
-            builder.append("- sin cartas");
-            return builder.toString();
+    private void renderHumanHandSlots(PlayerState player) {
+        for (int i = 0; i < humanHandCardViews.length; i++) {
+            TextView slot = humanHandCardViews[i];
+            if (i < player.hand.size()) {
+                GameCard card = player.hand.get(i);
+                String compactName = card.name.length() > 22 ? card.name.substring(0, 22) + "…" : card.name;
+                slot.setText((i + 1) + "\n" + compactName);
+                slot.setAlpha(1f);
+            } else {
+                slot.setText("-");
+                slot.setAlpha(0.45f);
+            }
         }
-        for (int i = 0; i < player.hand.size(); i++) {
-            GameCard card = player.hand.get(i);
-            String compactName = card.name.length() > 16 ? card.name.substring(0, 16) + "…" : card.name;
-            builder.append(i + 1)
-                    .append(") ")
-                    .append(compactName)
+    }
+
+    private void showCardDetailPanel(GameCard card) {
+        View panel = LayoutInflater.from(this).inflate(R.layout.panel_card_detail, null, false);
+        TextView title = panel.findViewById(R.id.detailCardTitle);
+        TextView type = panel.findViewById(R.id.detailCardType);
+        TextView rarity = panel.findViewById(R.id.detailCardRarity);
+        TextView description = panel.findViewById(R.id.detailCardDescription);
+
+        title.setText(card.id + " · " + card.name);
+        type.setText("Tipo: " + card.type);
+        rarity.setText("Rareza: " + (card.metadata == null || card.metadata.trim().isEmpty() ? "Sin dato" : card.metadata));
+        description.setText("Descripción: " + (card.description == null || card.description.trim().isEmpty() ? "Sin descripción" : card.description));
+
+        new AlertDialog.Builder(this)
+                .setTitle("Detalle de carta")
+                .setView(panel)
+                .setPositiveButton(R.string.play_confirm, null)
+                .show();
+    }
+
+    private void showSpeciesDetailPanel(PlayerState player, int speciesIndex, SpeciesState species) {
+        View panel = LayoutInflater.from(this).inflate(R.layout.panel_species_detail, null, false);
+        TextView title = panel.findViewById(R.id.detailSpeciesTitle);
+        TextView summary = panel.findViewById(R.id.detailSpeciesSummary);
+        TextView stats = panel.findViewById(R.id.detailSpeciesStats);
+        TextView cards = panel.findViewById(R.id.detailSpeciesCards);
+
+        title.setText("Especie " + (speciesIndex + 1) + " · " + player.name);
+        summary.setText("Individuos: " + species.individuals + " | Comida: " + species.food + " | Salud base: " + species.health);
+        stats.setText(buildSpeciesBarsText(species));
+        cards.setText(buildSpeciesCardsText(species));
+
+        new AlertDialog.Builder(this)
+                .setTitle("Detalle de especie")
+                .setView(panel)
+                .setPositiveButton(R.string.play_confirm, null)
+                .show();
+    }
+
+    private String buildSpeciesBarsText(SpeciesState species) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("Salud ").append(buildBar(clamp(species.health, ATTRIBUTE_MIN, ATTRIBUTE_MAX))).append("\n");
+        builder.append("Ataque ").append(buildBar(clamp(species.getAttack(), ATTRIBUTE_MIN, ATTRIBUTE_MAX))).append("\n");
+        builder.append("Armadura ").append(buildBar(clamp(species.getArmor(), ATTRIBUTE_MIN, ATTRIBUTE_MAX))).append("\n");
+        builder.append("Velocidad ").append(buildBar(clamp(species.getSpeed(), ATTRIBUTE_MIN, ATTRIBUTE_MAX))).append("\n");
+        builder.append("Percepción ").append(buildBar(clamp(species.getPerception(), ATTRIBUTE_MIN, ATTRIBUTE_MAX))).append("\n");
+        builder.append("Metabolismo ").append(buildBar(clamp(species.getMetabolism(activeBiome), ATTRIBUTE_MIN, ATTRIBUTE_MAX)));
+        return builder.toString();
+    }
+
+    private String buildSpeciesCardsText(SpeciesState species) {
+        if (species.cards.isEmpty()) {
+            return "Sin cartas de adaptación.";
+        }
+        StringBuilder builder = new StringBuilder();
+        for (GameCard card : species.cards) {
+            builder.append("• ")
+                    .append(card.id)
+                    .append(" · ")
+                    .append(card.name)
+                    .append(" (")
+                    .append(card.type)
+                    .append(")\n")
+                    .append("   ")
+                    .append(card.description)
                     .append("\n");
         }
-        return builder.toString();
+        return builder.toString().trim();
     }
 
     private CharSequence formatSpeciesAt(PlayerState player, int index) {
