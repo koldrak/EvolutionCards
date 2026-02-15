@@ -429,7 +429,7 @@
                         android:layout_height="32dp"
                         android:layout_weight="1"
                         android:layout_marginStart="3dp"
-                        android:text="@string/play_action_pass"
+                        android:text="@string/play_action_discard_hand"
                         android:textSize="8sp"
                         app:cornerRadius="8dp" />
                 </LinearLayout>
