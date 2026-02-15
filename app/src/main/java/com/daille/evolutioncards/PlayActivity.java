@@ -41,6 +41,7 @@ public class PlayActivity extends AppCompatActivity {
     private static final int MAX_SPECIES = 3;
     private static final int ATTRIBUTE_MIN = 0;
     private static final int ATTRIBUTE_MAX = 10;
+    private static final int STAT_LABEL_WIDTH = "Metabolismo".length();
 
     private final Random random = new Random();
     private final List<PlayerState> players = new ArrayList<>();
@@ -1198,10 +1199,10 @@ public class PlayActivity extends AppCompatActivity {
     private CharSequence createStatLine(String label, int rawValue, int color) {
         int value = clamp(rawValue, ATTRIBUTE_MIN, ATTRIBUTE_MAX);
         SpannableStringBuilder line = new SpannableStringBuilder();
-        int startLabel = line.length();
-        line.append(label).append("=").append(String.valueOf(value));
-        line.setSpan(new StyleSpan(android.graphics.Typeface.BOLD), startLabel, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        line.append(" ");
+
+        String prefix = String.format(Locale.US, "%-" + STAT_LABEL_WIDTH + "s=%2d ", label, value);
+        line.append(prefix);
+        line.setSpan(new StyleSpan(android.graphics.Typeface.BOLD), 0, prefix.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 
         for (int i = 0; i < ATTRIBUTE_MAX; i++) {
             int start = line.length();
