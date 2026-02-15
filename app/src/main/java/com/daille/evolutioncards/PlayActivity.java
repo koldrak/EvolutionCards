@@ -305,9 +305,9 @@ public class PlayActivity extends AppCompatActivity {
                     SpeciesState species = new SpeciesState();
                     species.individuals = 1;
                     species.food = 1;
-                    species.health = 1;
                     species.addCard(first, random);
                     species.addCard(second, random);
+                    species.health = species.getAdaptationHealth();
                     applyOnPlayCardEffects(human, species, first);
                     applyOnPlayCardEffects(human, species, second);
                     human.species.add(species);
@@ -363,9 +363,9 @@ public class PlayActivity extends AppCompatActivity {
         SpeciesState species = new SpeciesState();
         species.individuals = 1;
         species.food = 1;
-        species.health = 1;
         species.addCard(first, random);
         species.addCard(second, random);
+        species.health = species.getAdaptationHealth();
         applyOnPlayCardEffects(player, species, first);
         applyOnPlayCardEffects(player, species, second);
         player.species.add(species);
@@ -583,7 +583,7 @@ public class PlayActivity extends AppCompatActivity {
                 if (lowHealth || starvation) {
                     species.individuals -= 1;
                     species.food = Math.max(0, species.food);
-                    species.health = Math.max(1, species.individuals);
+                    species.health = species.getAdaptationHealth();
                     species.clearStatuses();
                     String lossMessage;
                     if (starvation) {
@@ -611,8 +611,8 @@ public class PlayActivity extends AppCompatActivity {
                     continue;
                 }
 
-                species.health = Math.max(species.health, species.individuals);
                 species.trimNonJawToIndividuals(random);
+                species.health = species.getAdaptationHealth();
             }
         }
     }
@@ -625,7 +625,7 @@ public class PlayActivity extends AppCompatActivity {
                 if (species.food >= fertility) {
                     species.food -= fertility;
                     species.individuals += 1;
-                    species.health = Math.max(species.health, species.individuals);
+                    species.health = species.getAdaptationHealth();
                     player.score += 5;
                     String reproductionMessage = "Especie " + (i + 1) + " de " + player.name + " se reprodujo (+1 individuo).";
                     appendLog(reproductionMessage);
@@ -1533,6 +1533,10 @@ public class PlayActivity extends AppCompatActivity {
                 }
             }
             return count;
+        }
+
+        int getAdaptationHealth() {
+            return getNonJawCardCount();
         }
 
         boolean replaceRandomNonJaw(GameCard replacement, Random random) {
