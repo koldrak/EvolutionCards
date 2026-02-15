@@ -30,6 +30,8 @@ import java.util.Set;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class PlayActivity extends AppCompatActivity {
 
@@ -46,11 +48,13 @@ public class PlayActivity extends AppCompatActivity {
     private final Random random = new Random();
     private final List<PlayerState> players = new ArrayList<>();
     private final List<GameCard> biomeDeck = new ArrayList<>();
+    private final List<GameCard> revealedBiomes = new ArrayList<>();
     private final List<SpeciesRef> forageParticipants = new ArrayList<>();
     private final List<SpeciesRef> attackParticipants = new ArrayList<>();
 
     private TextView biomeLabel;
     private TextView biomeEffectsLabel;
+    private TextView biomeRevealedLabel;
     private TextView humanSpecies1Label;
     private TextView humanSpecies2Label;
     private TextView humanSpecies3Label;
@@ -94,6 +98,7 @@ public class PlayActivity extends AppCompatActivity {
 
         biomeLabel = findViewById(R.id.biomeLabel);
         biomeEffectsLabel = findViewById(R.id.biomeEffectsLabel);
+        biomeRevealedLabel = findViewById(R.id.biomeRevealedLabel);
         humanSpecies1Label = findViewById(R.id.humanSpecies1Label);
         humanSpecies2Label = findViewById(R.id.humanSpecies2Label);
         humanSpecies3Label = findViewById(R.id.humanSpecies3Label);
@@ -176,7 +181,11 @@ public class PlayActivity extends AppCompatActivity {
         }
 
         Collections.shuffle(biomeDeck, random);
-        activeBiome = biomeDeck.isEmpty() ? null : biomeDeck.get(0);
+        revealedBiomes.clear();
+        for (int i = 0; i < Math.min(3, biomeDeck.size()); i++) {
+            revealedBiomes.add(biomeDeck.get(i));
+        }
+        activeBiome = revealedBiomes.isEmpty() ? null : revealedBiomes.get(0);
 
         for (int i = 0; i < playerCount; i++) {
             List<GameCard> draft = new ArrayList<>(adaptationPool);
@@ -294,11 +303,13 @@ public class PlayActivity extends AppCompatActivity {
                     GameCard second = human.hand.remove(idxB);
 
                     SpeciesState species = new SpeciesState();
-                    species.addCard(first, random);
-                    species.addCard(second, random);
                     species.individuals = 1;
                     species.food = 1;
                     species.health = 1;
+                    species.addCard(first, random);
+                    species.addCard(second, random);
+                    applyOnPlayCardEffects(human, species, first);
+                    applyOnPlayCardEffects(human, species, second);
                     human.species.add(species);
 
                     appendLog("Humano crea una especie nueva (selección manual).");
@@ -350,11 +361,13 @@ public class PlayActivity extends AppCompatActivity {
         player.hand.remove(second);
 
         SpeciesState species = new SpeciesState();
-        species.addCard(first, random);
-        species.addCard(second, random);
         species.individuals = 1;
         species.food = 1;
         species.health = 1;
+        species.addCard(first, random);
+        species.addCard(second, random);
+        applyOnPlayCardEffects(player, species, first);
+        applyOnPlayCardEffects(player, species, second);
         player.species.add(species);
         return true;
     }
@@ -384,6 +397,7 @@ public class PlayActivity extends AppCompatActivity {
             SpeciesState targetSpecies = addCandidates.get(random.nextInt(addCandidates.size()));
             GameCard addition = handCandidates.get(random.nextInt(handCandidates.size()));
             targetSpecies.addCard(addition, random);
+            applyOnPlayCardEffects(player, targetSpecies, addition);
             player.hand.remove(addition);
             return true;
         }
@@ -487,11 +501,13 @@ public class PlayActivity extends AppCompatActivity {
             ref.species.food += gain;
             foragePool -= gain;
             forageParticipants.add(ref);
+            ref.species.forageSuccessThisRound = true;
             renderForageTokens(foragePool);
             String feedMessage = getSpeciesLabel(ref) + " forrajea +" + gain + " comida (quedan " + foragePool + ").";
             appendLog(feedMessage);
             showMessage(feedMessage);
         }
+        applyPostForageAbilities();
         if (forageParticipants.isEmpty()) {
             appendLog("Ninguna especie logró comer en forrajeo.");
             showMessage("Ninguna especie logró comer en forrajeo.");
@@ -540,6 +556,7 @@ public class PlayActivity extends AppCompatActivity {
                 String failMessage = getSpeciesLabel(attackerRef)
                         + " ataca por " + resolution.modeLabel + " a " + getSpeciesLabel(target)
                         + ". Resultado ataque fallido.";
+                maybeApplyFailedAttackDefenderBonus(target.species, target);
                 appendLog(failMessage);
                 showMessage(failMessage);
             }
@@ -567,6 +584,7 @@ public class PlayActivity extends AppCompatActivity {
                     species.individuals -= 1;
                     species.food = Math.max(0, species.food);
                     species.health = Math.max(1, species.individuals);
+                    species.clearStatuses();
                     String lossMessage;
                     if (starvation) {
                         lossMessage = speciesName + " pierde 1 individuo por falta de alimentación.";
@@ -634,6 +652,8 @@ public class PlayActivity extends AppCompatActivity {
         for (PlayerState player : players) {
             for (SpeciesState species : player.species) {
                 species.tookPredationDamageThisRound = false;
+                species.forageSuccessThisRound = false;
+                species.failedAttackFoodBonusAppliedThisRound = false;
                 species.lastAttacker = null;
             }
         }
@@ -674,13 +694,13 @@ public class PlayActivity extends AppCompatActivity {
         for (PlayerState player : players) {
             topScore = Math.max(topScore, player.score);
         }
-        if (biomeDeck.size() >= 3) {
+        if (revealedBiomes.size() >= 3) {
             if (topScore >= 100) {
-                activeBiome = biomeDeck.get(2);
+                activeBiome = revealedBiomes.get(2);
             } else if (topScore >= 50) {
-                activeBiome = biomeDeck.get(1);
+                activeBiome = revealedBiomes.get(1);
             } else {
-                activeBiome = biomeDeck.get(0);
+                activeBiome = revealedBiomes.get(0);
             }
         }
     }
@@ -783,6 +803,36 @@ public class PlayActivity extends AppCompatActivity {
         }
     }
 
+    private void applyPostForageAbilities() {
+        for (SpeciesRef ref : collectSpecies()) {
+            SpeciesState species = ref.species;
+            String primaryJawId = species.getPrimaryJawId();
+            if ("A8".equals(primaryJawId) && !species.forageSuccessThisRound) {
+                species.food += 1;
+                String message = getSpeciesLabel(ref) + " activa Mandíbula Filtradora y obtiene +1 comida fuera de la zona de forraje.";
+                appendLog(message);
+                showMessage(message);
+            }
+            if ("A106".equals(primaryJawId) && !species.forageSuccessThisRound) {
+                species.food += 1;
+                String message = getSpeciesLabel(ref) + " activa Mandíbula de Broteo y obtiene +1 comida al no forrajear.";
+                appendLog(message);
+                showMessage(message);
+            }
+        }
+    }
+
+    private void maybeApplyFailedAttackDefenderBonus(SpeciesState defender, SpeciesRef defenderRef) {
+        if (!defender.hasCard("A113") || defender.failedAttackFoodBonusAppliedThisRound) {
+            return;
+        }
+        defender.food += 1;
+        defender.failedAttackFoodBonusAppliedThisRound = true;
+        String message = getSpeciesLabel(defenderRef) + " activa Mandíbula de Corte de Corteza y gana +1 comida por ataque fallido recibido.";
+        appendLog(message);
+        showMessage(message);
+    }
+
     private boolean wasInForageOrAttack(SpeciesState species) {
         for (SpeciesRef ref : forageParticipants) {
             if (ref.species == species) {
@@ -882,6 +932,19 @@ public class PlayActivity extends AppCompatActivity {
         return "Efectos: " + activeBiome.description.replace("|", " · ");
     }
 
+    private String getRevealedBiomesText() {
+        if (revealedBiomes.isEmpty()) {
+            return "Biomas revelados: -";
+        }
+        List<String> labels = new ArrayList<>();
+        for (int i = 0; i < revealedBiomes.size(); i++) {
+            GameCard biome = revealedBiomes.get(i);
+            String activeTag = activeBiome == biome ? " (activo)" : "";
+            labels.add((i + 1) + ") " + biome.name + activeTag);
+        }
+        return "Biomas revelados: " + String.join(" · ", labels);
+    }
+
     private void appendLog(String message) {
         CharSequence current = logLabel.getText();
         String next = (current == null || current.length() == 0) ? message : current + "\n" + message;
@@ -891,6 +954,7 @@ public class PlayActivity extends AppCompatActivity {
     private void refreshUi() {
         biomeLabel.setText(getString(R.string.play_forage_zone, activeBiome == null ? "N/D" : activeBiome.name));
         biomeEffectsLabel.setText(getBiomeEffectsText());
+        biomeRevealedLabel.setText(getRevealedBiomesText());
 
         PlayerState human = players.get(0);
         PlayerState bot1 = players.size() > 1 ? players.get(1) : null;
@@ -1316,6 +1380,9 @@ public class PlayActivity extends AppCompatActivity {
         int food;
         int health;
         boolean tookPredationDamageThisRound;
+        boolean forageSuccessThisRound;
+        boolean failedAttackFoodBonusAppliedThisRound;
+        int lastStatusAppliedRound = -1;
         PlayerState lastAttacker;
 
         DietType getDietType() {
@@ -1372,6 +1439,18 @@ public class PlayActivity extends AppCompatActivity {
                 }
             }
             return null;
+        }
+
+        boolean hasCard(String cardId) {
+            if (cardId == null) {
+                return false;
+            }
+            for (GameCard card : cards) {
+                if (cardId.equalsIgnoreCase(card.id)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         int getAttack() {
@@ -1539,10 +1618,19 @@ public class PlayActivity extends AppCompatActivity {
             if (status == null || statuses.contains(status)) {
                 return;
             }
+            if (lastStatusAppliedRound == round) {
+                return;
+            }
             if (statuses.size() >= 2) {
                 statuses.remove(0);
             }
             statuses.add(status);
+            lastStatusAppliedRound = round;
+        }
+
+        void clearStatuses() {
+            statuses.clear();
+            lastStatusAppliedRound = -1;
         }
 
         boolean hasStatus(Status status) {
@@ -1557,6 +1645,7 @@ public class PlayActivity extends AppCompatActivity {
                     continue;
                 }
                 value += extractStatValue(info, stat);
+                value += extractBiomeAbilityModifier(info, stat);
             }
             if ("attack".equals(stat) && value == 0) {
                 for (GameCard card : cards) {
@@ -1602,6 +1691,47 @@ public class PlayActivity extends AppCompatActivity {
             return parseIntSafe(raw);
         }
 
+        private int extractBiomeAbilityModifier(CardDesignDetails.DesignCardInfo info, String stat) {
+            if (info == null || info.ability == null || activeBiome == null || activeBiome.name == null) {
+                return 0;
+            }
+            String ability = info.ability;
+            String biome = activeBiome.name;
+            String statLabel = mapStatToAbilityLabel(stat);
+            if (statLabel == null) {
+                return 0;
+            }
+            Pattern pattern = Pattern.compile("En\\s+" + Pattern.quote(biome) + "[^:]*:\\s*([+-]?\\d+)\\s+" + Pattern.quote(statLabel), Pattern.CASE_INSENSITIVE);
+            Matcher matcher = pattern.matcher(ability);
+            if (!matcher.find()) {
+                return 0;
+            }
+            return parseIntSafe(matcher.group(1));
+        }
+
+        private String mapStatToAbilityLabel(String stat) {
+            switch (stat) {
+                case "attack":
+                    return "Ataque";
+                case "armor":
+                    return "Armadura";
+                case "health":
+                    return "Salud";
+                case "speed":
+                    return "Velocidad";
+                case "perception":
+                    return "Percepción";
+                case "fertility":
+                    return "Fertilidad";
+                case "metabolism":
+                    return "Metabolismo";
+                case "temperature":
+                    return "Temperatura";
+                default:
+                    return null;
+            }
+        }
+
         private int getBiomeModifier(String statLabel) {
             if (activeBiome == null || activeBiome.description == null) {
                 return 0;
@@ -1631,6 +1761,27 @@ public class PlayActivity extends AppCompatActivity {
             } catch (NumberFormatException ignored) {
                 return 0;
             }
+        }
+    }
+
+    private void applyOnPlayCardEffects(PlayerState owner, SpeciesState targetSpecies, GameCard card) {
+        if (owner == null || targetSpecies == null || card == null || card.id == null) {
+            return;
+        }
+        String cardId = card.id.toUpperCase(Locale.US);
+        if ("A4".equals(cardId)) {
+            owner.drawTo(Math.min(HAND_TARGET + 1, owner.hand.size() + 1));
+            if (!owner.hand.isEmpty()) {
+                owner.hand.remove(random.nextInt(owner.hand.size()));
+            }
+            appendLog(owner.name + " activa Mandíbula Canina: roba 1 carta y descarta 1 aleatoria.");
+        } else if ("A112".equals(cardId)) {
+            targetSpecies.food += 2;
+            appendLog(owner.name + " activa Pico Granívoro: la especie obtiene +2 comida al jugarla.");
+        } else if ("A126".equals(cardId) && activeBiome != null
+                && ("Llanura".equalsIgnoreCase(activeBiome.name) || "Estepa".equalsIgnoreCase(activeBiome.name))) {
+            owner.drawTo(Math.min(HAND_TARGET + 1, owner.hand.size() + 1));
+            appendLog(owner.name + " activa Microhábitat Favorable: roba 1 carta por bioma activo.");
         }
     }
 
