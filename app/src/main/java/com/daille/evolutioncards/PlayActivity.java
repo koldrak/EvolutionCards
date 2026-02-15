@@ -231,7 +231,10 @@ public class PlayActivity extends AppCompatActivity {
             showMessage(msg);
             return;
         }
-        String msg = bot.name + " pasa su acción.";
+
+        int discardedCards = discardHandAndDraw(bot);
+        String msg = bot.name + " descarta su mano (" + discardedCards + " cartas) y roba "
+                + bot.hand.size() + " cartas nuevas.";
         appendLog(msg);
         showMessage(msg);
     }
@@ -328,10 +331,15 @@ public class PlayActivity extends AppCompatActivity {
 
     private void humanActionDiscardHand() {
         PlayerState human = players.get(0);
-        int discardedCards = human.hand.size();
-        human.hand.clear();
-        human.drawTo(HAND_TARGET);
+        int discardedCards = discardHandAndDraw(human);
         appendLog("Humano descarta su mano (" + discardedCards + " cartas) y roba " + human.hand.size() + " cartas nuevas.");
+    }
+
+    private int discardHandAndDraw(PlayerState player) {
+        int discardedCards = player.hand.size();
+        player.hand.clear();
+        player.drawTo(HAND_TARGET);
+        return discardedCards;
     }
 
     private boolean tryCreateSpecies(PlayerState player) {
