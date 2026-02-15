@@ -31,7 +31,10 @@ import java.util.Random;
 
 public class PlayActivity extends AppCompatActivity {
 
-    private static final int PLAYER_COUNT = 3;
+    public static final String EXTRA_PLAYER_COUNT = "player_count";
+    private static final int DEFAULT_PLAYER_COUNT = 3;
+    private static final int MIN_PLAYER_COUNT = 2;
+    private static final int MAX_PLAYER_COUNT = 3;
     private static final int HAND_TARGET = 5;
     private static final int MAX_SPECIES = 3;
     private static final int ATTRIBUTE_MIN = 0;
@@ -66,6 +69,8 @@ public class PlayActivity extends AppCompatActivity {
 
     private final ArrayDeque<String> pendingMessages = new ArrayDeque<>();
     private boolean messageVisible = false;
+    private int playerCount = DEFAULT_PLAYER_COUNT;
+    private boolean gameOver = false;
 
     private int currentPlayer = 0;
     private int round = 1;
@@ -76,6 +81,8 @@ public class PlayActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_play);
+        int requestedPlayerCount = getIntent().getIntExtra(EXTRA_PLAYER_COUNT, DEFAULT_PLAYER_COUNT);
+        playerCount = clamp(requestedPlayerCount, MIN_PLAYER_COUNT, MAX_PLAYER_COUNT);
         if (getSupportActionBar() != null) {
             getSupportActionBar().hide();
         }
@@ -112,15 +119,24 @@ public class PlayActivity extends AppCompatActivity {
         MaterialButton passButton = findViewById(R.id.buttonPass);
 
         createSpeciesButton.setOnClickListener(v -> {
+            if (gameOver) {
+                return;
+            }
             showCreateSpeciesDialog();
         });
 
         replaceCardButton.setOnClickListener(v -> {
+            if (gameOver) {
+                return;
+            }
             humanActionReplaceCard();
             endHumanTurn();
         });
 
         passButton.setOnClickListener(v -> {
+            if (gameOver) {
+                return;
+            }
             appendLog("Humano pasa su acción.");
             endHumanTurn();
         });
@@ -129,9 +145,19 @@ public class PlayActivity extends AppCompatActivity {
 
         setupHandInteractions();
         setupSpeciesInteractions();
+        if (playerCount == 2) {
+            hideBotTwoColumn();
+        }
 
         setupGame();
         refreshUi();
+    }
+
+    private void hideBotTwoColumn() {
+        bot2DeckLabel.setVisibility(View.INVISIBLE);
+        bot2Species1Label.setVisibility(View.INVISIBLE);
+        bot2Species2Label.setVisibility(View.INVISIBLE);
+        bot2Species3Label.setVisibility(View.INVISIBLE);
     }
 
     private void setupGame() {
@@ -147,7 +173,7 @@ public class PlayActivity extends AppCompatActivity {
         Collections.shuffle(biomeDeck, random);
         activeBiome = biomeDeck.isEmpty() ? null : biomeDeck.get(0);
 
-        for (int i = 0; i < PLAYER_COUNT; i++) {
+        for (int i = 0; i < playerCount; i++) {
             List<GameCard> draft = new ArrayList<>(adaptationPool);
             Collections.shuffle(draft, random);
             List<GameCard> deck = new ArrayList<>(draft.subList(0, Math.min(40, draft.size())));
@@ -157,14 +183,21 @@ public class PlayActivity extends AppCompatActivity {
         }
 
         beginPhase(Phase.PLAYER_ACTION, "Ronda 1 lista. Elige una acción: crear especie, reemplazar carta o pasar.");
-        appendLog("Partida iniciada. Se generaron 3 mazos aleatorios (1 humano + 2 bots).");
+        appendLog("Partida iniciada. Se generaron " + playerCount + " mazos aleatorios.");
     }
 
     private void endHumanTurn() {
+        if (gameOver) {
+            return;
+        }
         beginPhase(Phase.PLAYER_ACTION, "Turno de bots: observa sus acciones.");
         currentPlayer = 1;
         runBotsUntilRoundEnds();
         resolveEndOfRound();
+        if (gameOver) {
+            refreshUi();
+            return;
+        }
         currentPlayer = 0;
         round++;
         beginPhase(Phase.PLAYER_ACTION, "Tu turno: elige una acción.");
@@ -172,7 +205,7 @@ public class PlayActivity extends AppCompatActivity {
     }
 
     private void runBotsUntilRoundEnds() {
-        for (int i = 1; i < PLAYER_COUNT; i++) {
+        for (int i = 1; i < playerCount; i++) {
             runBotAction(players.get(i));
         }
     }
@@ -336,6 +369,20 @@ public class PlayActivity extends AppCompatActivity {
             return false;
         }
 
+        List<SpeciesState> addCandidates = new ArrayList<>();
+        for (SpeciesState species : player.species) {
+            if (species.getNonJawCardCount() < species.individuals) {
+                addCandidates.add(species);
+            }
+        }
+        if (!addCandidates.isEmpty()) {
+            SpeciesState targetSpecies = addCandidates.get(random.nextInt(addCandidates.size()));
+            GameCard addition = handCandidates.get(random.nextInt(handCandidates.size()));
+            targetSpecies.cards.add(addition);
+            player.hand.remove(addition);
+            return true;
+        }
+
         List<SpeciesState> speciesCandidates = new ArrayList<>();
         for (SpeciesState species : player.species) {
             if (species.getNonJawCardCount() > 0) {
@@ -358,6 +405,7 @@ public class PlayActivity extends AppCompatActivity {
     private void resolveEndOfRound() {
         forageParticipants.clear();
         attackParticipants.clear();
+        clearRoundCombatMarkers();
 
         beginPhase(Phase.FORAGE, "Se reparte comida en la zona de forraje y comen por velocidad.");
         int foragePool = random.nextInt(10) + 1;
@@ -411,8 +459,13 @@ public class PlayActivity extends AppCompatActivity {
             AttackResolution resolution = resolveAttack(attackerRef, target);
             if (resolution.success) {
                 target.species.health -= resolution.damage;
+                if (resolution.damage > 0) {
+                    target.species.tookPredationDamageThisRound = true;
+                    target.species.lastAttacker = attackerRef.player;
+                }
                 attacker.food += attacker.getAttack();
                 attackerRef.player.score += attacker.getAttack();
+                maybeApplyAttackStatus(attacker, target.species);
                 String attackMessage = getSpeciesLabel(attackerRef)
                         + " ataca por " + resolution.modeLabel + " a " + getSpeciesLabel(target)
                         + ". Resultado ataque exitoso " + getSpeciesLabel(target)
@@ -434,6 +487,12 @@ public class PlayActivity extends AppCompatActivity {
             for (int i = player.species.size() - 1; i >= 0; i--) {
                 SpeciesState species = player.species.get(i);
                 String speciesName = "Especie " + (i + 1) + " de " + player.name;
+
+                if (species.hasStatus(Status.ENVENENADO)) {
+                    species.health -= 1;
+                    appendLog(speciesName + " sufre 1 daño por estado Envenenado.");
+                }
+
                 int metabolism = species.getMetabolism(activeBiome);
                 species.food -= metabolism;
                 appendLog(speciesName + " consume " + metabolism + " comida por metabolismo.");
@@ -455,6 +514,9 @@ public class PlayActivity extends AppCompatActivity {
                 }
 
                 if (species.individuals < 1) {
+                    if (species.lastAttacker != null && species.tookPredationDamageThisRound) {
+                        species.lastAttacker.score += 4;
+                    }
                     player.species.remove(i);
                     String extinctionMessage;
                     if (starvation) {
@@ -468,6 +530,7 @@ public class PlayActivity extends AppCompatActivity {
                 }
 
                 species.health = Math.max(species.health, species.individuals);
+                species.trimNonJawToIndividuals(random);
             }
         }
 
@@ -475,7 +538,7 @@ public class PlayActivity extends AppCompatActivity {
         for (PlayerState player : players) {
             for (int i = 0; i < player.species.size(); i++) {
                 SpeciesState species = player.species.get(i);
-                int fertility = Math.max(1, species.individuals);
+                int fertility = species.getFertility();
                 if (species.food >= fertility) {
                     species.food -= fertility;
                     species.individuals += 1;
@@ -494,13 +557,54 @@ public class PlayActivity extends AppCompatActivity {
                 player.score += species.food;
                 player.score += species.cards.size();
             }
+            player.score += player.species.size() * 10;
             int previousHand = player.hand.size();
             player.drawTo(HAND_TARGET);
             appendLog(player.name + " repone mano: " + previousHand + " → " + player.hand.size() + " cartas. Puntaje: " + player.score + ".");
         }
 
         maybeAdvanceBiome();
+        checkGameOver();
         refreshUi();
+    }
+
+    private void clearRoundCombatMarkers() {
+        for (PlayerState player : players) {
+            for (SpeciesState species : player.species) {
+                species.tookPredationDamageThisRound = false;
+                species.lastAttacker = null;
+            }
+        }
+    }
+
+    private void checkGameOver() {
+        if (gameOver) {
+            return;
+        }
+        PlayerState winner = null;
+        for (PlayerState player : players) {
+            if (winner == null || player.score > winner.score) {
+                winner = player;
+            }
+        }
+        boolean scoreLimitReached = winner != null && winner.score >= 150;
+        boolean deckExhausted = false;
+        for (PlayerState player : players) {
+            if (player.deck.isEmpty()) {
+                deckExhausted = true;
+                break;
+            }
+        }
+        if (!scoreLimitReached && !deckExhausted) {
+            return;
+        }
+
+        gameOver = true;
+        String reason = scoreLimitReached
+                ? "Fin de partida: " + winner.name + " alcanzó 150 puntos."
+                : "Fin de partida: se agotó al menos un mazo.";
+        appendLog(reason);
+        showMessage(reason);
     }
 
     private void maybeAdvanceBiome() {
@@ -590,6 +694,31 @@ public class PlayActivity extends AppCompatActivity {
 
         int damage = success ? Math.max(0, attacker.getAttack() - (defender.getArmor() / 2)) : 0;
         return new AttackResolution(modeLabel, success, damage);
+    }
+
+    private void maybeApplyAttackStatus(SpeciesState attacker, SpeciesState defender) {
+        String jawId = attacker.getPrimaryJawId();
+        if (jawId == null) {
+            return;
+        }
+        if ("A5".equals(jawId)) {
+            defender.applyStatus(Status.ENVENENADO);
+            return;
+        }
+        if ("A6".equals(jawId) || "A12".equals(jawId)) {
+            defender.applyStatus(Status.PARALIZADO);
+            return;
+        }
+        if ("A14".equals(jawId)) {
+            Status[] rollable = new Status[]{
+                    Status.ENVENENADO,
+                    Status.PARALIZADO,
+                    Status.CONFUNDIDO,
+                    Status.ENFERMEDAD,
+                    Status.TERROR
+            };
+            defender.applyStatus(rollable[random.nextInt(rollable.length)]);
+        }
     }
 
     private boolean wasInForageOrAttack(SpeciesState species) {
@@ -690,8 +819,8 @@ public class PlayActivity extends AppCompatActivity {
         biomeLabel.setText(getString(R.string.play_forage_zone, activeBiome == null ? "N/D" : activeBiome.name));
 
         PlayerState human = players.get(0);
-        PlayerState bot1 = players.get(1);
-        PlayerState bot2 = players.get(2);
+        PlayerState bot1 = players.size() > 1 ? players.get(1) : null;
+        PlayerState bot2 = players.size() > 2 ? players.get(2) : null;
 
         humanDeckLabel.setText(formatHumanDeck(human));
         renderHumanHandSlots(human);
@@ -700,16 +829,19 @@ public class PlayActivity extends AppCompatActivity {
         humanSpecies2Label.setText(formatSpeciesAt(human, 1));
         humanSpecies3Label.setText(formatSpeciesAt(human, 2));
 
-        bot1DeckLabel.setText(formatBotDeck(bot1));
-        bot2DeckLabel.setText(formatBotDeck(bot2));
+        if (bot1 != null) {
+            bot1DeckLabel.setText(formatBotDeck(bot1));
+            bot1Species1Label.setText(formatSpeciesAt(bot1, 0));
+            bot1Species2Label.setText(formatSpeciesAt(bot1, 1));
+            bot1Species3Label.setText(formatSpeciesAt(bot1, 2));
+        }
 
-        bot1Species1Label.setText(formatSpeciesAt(bot1, 0));
-        bot1Species2Label.setText(formatSpeciesAt(bot1, 1));
-        bot1Species3Label.setText(formatSpeciesAt(bot1, 2));
-
-        bot2Species1Label.setText(formatSpeciesAt(bot2, 0));
-        bot2Species2Label.setText(formatSpeciesAt(bot2, 1));
-        bot2Species3Label.setText(formatSpeciesAt(bot2, 2));
+        if (bot2 != null) {
+            bot2DeckLabel.setText(formatBotDeck(bot2));
+            bot2Species1Label.setText(formatSpeciesAt(bot2, 0));
+            bot2Species2Label.setText(formatSpeciesAt(bot2, 1));
+            bot2Species3Label.setText(formatSpeciesAt(bot2, 2));
+        }
     }
 
     private void setupHandInteractions() {
@@ -740,6 +872,9 @@ public class PlayActivity extends AppCompatActivity {
 
     private void setupSpeciesClick(TextView view, int playerIndex, int speciesIndex) {
         view.setOnClickListener(v -> {
+            if (playerIndex >= players.size()) {
+                return;
+            }
             PlayerState player = players.get(playerIndex);
             if (speciesIndex >= player.species.size()) {
                 return;
@@ -948,8 +1083,18 @@ public class PlayActivity extends AppCompatActivity {
         appendAttributeLine(builder, "Percepción", species.getPerception());
         appendAttributeLine(builder, "Metabolismo", species.getMetabolism(activeBiome));
 
-        int fertility = species.individuals;
+        int fertility = species.getFertility();
         appendAttributeLine(builder, "Fertilidad", fertility);
+
+        if (!species.statuses.isEmpty()) {
+            builder.append("\nEstados: ");
+            for (int i = 0; i < species.statuses.size(); i++) {
+                if (i > 0) {
+                    builder.append(", ");
+                }
+                builder.append(species.statuses.get(i).label);
+            }
+        }
 
         appendAttributeLine(builder, "Temperatura", getBiomeTemperatureValue(activeBiome));
         return builder;
@@ -1046,7 +1191,7 @@ public class PlayActivity extends AppCompatActivity {
         }
     }
 
-    private static class SpeciesState {
+    private class SpeciesState {
         private static final Set<String> HERBIVORE_JAWS = new HashSet<>(Arrays.asList(
                 "A11", "A102", "A103", "A104", "A105", "A106", "A107", "A108",
                 "A110", "A111", "A112", "A113", "A114", "A115", "A116"
@@ -1054,9 +1199,12 @@ public class PlayActivity extends AppCompatActivity {
         private static final Set<String> OMNIVORE_JAWS = new HashSet<>(Arrays.asList("A15", "A109"));
 
         final List<GameCard> cards = new ArrayList<>();
+        final List<Status> statuses = new ArrayList<>();
         int individuals;
         int food;
         int health;
+        boolean tookPredationDamageThisRound;
+        PlayerState lastAttacker;
 
         DietType getDietType() {
             boolean hasCarnivoreJaw = false;
@@ -1115,41 +1263,31 @@ public class PlayActivity extends AppCompatActivity {
         }
 
         int getAttack() {
-            int base = 0;
-            for (GameCard card : cards) {
-                if ("Mandíbula".equalsIgnoreCase(card.type)) {
-                    base += 1;
-                }
-            }
-            return Math.max(0, base);
+            return Math.max(0, getBaseStat("attack") + getBiomeModifier("Ataque"));
         }
 
         int getSpeed() {
-            int speed = 0;
-            for (GameCard card : cards) {
-                if ("Extremidades".equalsIgnoreCase(card.type) || "Alas".equalsIgnoreCase(card.type)) {
-                    speed += 1;
-                }
+            int speed = getBaseStat("speed") + getBiomeModifier("Velocidad");
+            if (hasStatus(Status.PARALIZADO)) {
+                return 0;
+            }
+            if (hasStatus(Status.TERROR)) {
+                speed += 2;
             }
             return speed;
         }
 
         int getArmor() {
-            int armor = 0;
-            for (GameCard card : cards) {
-                if ("Pelaje".equalsIgnoreCase(card.type)) {
-                    armor += 1;
-                }
-            }
-            return armor;
+            return getBaseStat("armor") + getBiomeModifier("Armadura");
         }
 
         int getPerception() {
-            int perception = 0;
-            for (GameCard card : cards) {
-                if ("Sentido".equalsIgnoreCase(card.type)) {
-                    perception += 1;
-                }
+            int perception = getBaseStat("perception") + getBiomeModifier("Percepción");
+            if (hasStatus(Status.CONFUNDIDO)) {
+                perception -= 3;
+            }
+            if (hasStatus(Status.TERROR)) {
+                return 0;
             }
             return perception;
         }
@@ -1159,26 +1297,21 @@ public class PlayActivity extends AppCompatActivity {
         }
 
         int getMetabolism(GameCard biome) {
-            int metabolism = Math.max(1, individuals);
-            int biomeTemp = 0;
-            if (biome != null && biome.description != null) {
-                int idx = biome.description.indexOf("Temperatura:");
-                if (idx >= 0) {
-                    String sub = biome.description.substring(idx).replace("Temperatura:", "").trim();
-                    String value = sub.split("\\|")[0].trim();
-                    try {
-                        biomeTemp = Integer.parseInt(value);
-                    } catch (NumberFormatException ignored) {
-                        biomeTemp = 0;
-                    }
-                }
-            }
+            int metabolism = Math.max(1, individuals + getBaseStat("metabolism") + getBiomeModifier("Metabolismo"));
+            int biomeTemp = getBiomeTemperatureValue(biome);
             if (biomeTemp >= 5 || biomeTemp <= -5) {
                 metabolism += 2;
             } else if (biomeTemp >= 3 || biomeTemp <= -3) {
                 metabolism += 1;
             }
+            if (hasStatus(Status.ENFERMEDAD)) {
+                metabolism += 1;
+            }
             return metabolism;
+        }
+
+        int getFertility() {
+            return Math.max(1, individuals + getBaseStat("fertility") + getBiomeModifier("Fertilidad"));
         }
 
         int getNonJawCardCount() {
@@ -1204,6 +1337,117 @@ public class PlayActivity extends AppCompatActivity {
             int idx = replaceable.get(random.nextInt(replaceable.size()));
             cards.set(idx, replacement);
             return true;
+        }
+
+        void trimNonJawToIndividuals(Random random) {
+            while (getNonJawCardCount() > individuals) {
+                List<Integer> replaceable = new ArrayList<>();
+                for (int i = 0; i < cards.size(); i++) {
+                    if (!"Mandíbula".equalsIgnoreCase(cards.get(i).type)) {
+                        replaceable.add(i);
+                    }
+                }
+                if (replaceable.isEmpty()) {
+                    return;
+                }
+                int idx = replaceable.get(random.nextInt(replaceable.size()));
+                cards.remove(idx);
+            }
+        }
+
+        void applyStatus(Status status) {
+            if (status == null || statuses.contains(status)) {
+                return;
+            }
+            if (statuses.size() >= 2) {
+                statuses.remove(0);
+            }
+            statuses.add(status);
+        }
+
+        boolean hasStatus(Status status) {
+            return statuses.contains(status);
+        }
+
+        private int getBaseStat(String stat) {
+            int value = 0;
+            for (GameCard card : cards) {
+                CardDesignDetails.DesignCardInfo info = CardDesignDetails.findByGameCard(card);
+                if (info == null) {
+                    continue;
+                }
+                value += extractStatValue(info, stat);
+            }
+            if ("attack".equals(stat) && value == 0) {
+                for (GameCard card : cards) {
+                    if ("Mandíbula".equalsIgnoreCase(card.type)) {
+                        value += 1;
+                    }
+                }
+            }
+            return value;
+        }
+
+        private int extractStatValue(CardDesignDetails.DesignCardInfo info, String stat) {
+            String raw;
+            switch (stat) {
+                case "attack":
+                    raw = info.attack;
+                    break;
+                case "armor":
+                    raw = info.armor;
+                    break;
+                case "health":
+                    raw = info.health;
+                    break;
+                case "speed":
+                    raw = info.speed;
+                    break;
+                case "perception":
+                    raw = info.perception;
+                    break;
+                case "fertility":
+                    raw = info.fertility;
+                    break;
+                case "metabolism":
+                    raw = info.metabolism;
+                    break;
+                default:
+                    raw = "";
+                    break;
+            }
+            return parseIntSafe(raw);
+        }
+
+        private int getBiomeModifier(String statLabel) {
+            if (activeBiome == null || activeBiome.description == null) {
+                return 0;
+            }
+            String[] parts = activeBiome.description.split("\\|");
+            for (String part : parts) {
+                String normalized = part.trim();
+                if (!normalized.startsWith(statLabel + ":")) {
+                    continue;
+                }
+                String rawValue = normalized.substring((statLabel + ":").length()).trim();
+                return parseIntSafe(rawValue);
+            }
+            return 0;
+        }
+
+        private int parseIntSafe(String rawValue) {
+            if (rawValue == null) {
+                return 0;
+            }
+            String cleaned = rawValue.trim().replace("+", "");
+            if (cleaned.isEmpty() || "-".equals(cleaned) || "----".equals(cleaned)) {
+                return 0;
+            }
+            try {
+                return Integer.parseInt(cleaned);
+            } catch (NumberFormatException ignored) {
+                return 0;
+            }
         }
     }
 
@@ -1252,6 +1496,20 @@ public class PlayActivity extends AppCompatActivity {
         HERBIVORE,
         CARNIVORE,
         OMNIVORE
+    }
+
+    private enum Status {
+        ENVENENADO("Envenenado"),
+        PARALIZADO("Paralizado"),
+        CONFUNDIDO("Confundido"),
+        ENFERMEDAD("Enfermedad"),
+        TERROR("Terror");
+
+        final String label;
+
+        Status(String label) {
+            this.label = label;
+        }
     }
 
     private enum Phase {
