@@ -480,6 +480,14 @@ public class PlayActivity extends AppCompatActivity {
         return String.format(Locale.US, "Mazo de\n%s\n\n%d", player.name.toLowerCase(Locale.US), player.deck.size());
     }
 
+    private String formatDeck(PlayerState player) {
+        return String.format(Locale.US, "%s\n• Mazo: %d\n• Mano: %d\n• Puntos: %d",
+                player.name,
+                player.deck.size(),
+                player.hand.size(),
+                player.score);
+    }
+
     private String formatHand(PlayerState player) {
         StringBuilder builder = new StringBuilder();
         builder.append(getString(R.string.play_hand_title)).append("\n");
