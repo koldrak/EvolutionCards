@@ -1,6 +1,10 @@
 package com.daille.evolutioncards;
 
 import android.os.Bundle;
+import android.text.SpannableString;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
 import android.util.TypedValue;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -29,6 +33,8 @@ public class PlayActivity extends AppCompatActivity {
     private static final int PLAYER_COUNT = 3;
     private static final int HAND_TARGET = 5;
     private static final int MAX_SPECIES = 3;
+    private static final int ATTRIBUTE_MIN = 0;
+    private static final int ATTRIBUTE_MAX = 10;
 
     private final Random random = new Random();
     private final List<PlayerState> players = new ArrayList<>();
@@ -721,20 +727,91 @@ public class PlayActivity extends AppCompatActivity {
         return builder.toString();
     }
 
-    private String formatSpeciesAt(PlayerState player, int index) {
+    private CharSequence formatSpeciesAt(PlayerState player, int index) {
         if (index >= player.species.size()) {
             return "Sin especie";
         }
         SpeciesState species = player.species.get(index);
-        return String.format(Locale.US,
-                "F:%d I:%d H:%d\nAT:%d VE:%d\nAR:%d PE:%d",
-                species.cards.size(),
-                species.individuals,
-                species.health,
-                species.getAttack(),
-                species.getSpeed(),
-                species.getArmor(),
-                species.getPerception());
+
+        SpannableStringBuilder builder = new SpannableStringBuilder();
+        builder.append("Individuos: ");
+        builder.append(createTokenDots(species.individuals, 0xFF000000));
+        builder.append("\nAlimentación: ");
+        builder.append(createTokenDots(species.food, 0xFF2E7D32));
+        builder.append("\n\n");
+
+        appendAttributeLine(builder, "Salud", species.health);
+        appendAttributeLine(builder, "Ataque", species.getAttack());
+        appendAttributeLine(builder, "Armadura", species.getArmor());
+        appendAttributeLine(builder, "Velocidad", species.getSpeed());
+        appendAttributeLine(builder, "Percepción", species.getPerception());
+        appendAttributeLine(builder, "Metabolismo", species.getMetabolism(activeBiome));
+
+        int fertility = species.individuals;
+        appendAttributeLine(builder, "Fertilidad", fertility);
+
+        appendAttributeLine(builder, "Temperatura", getBiomeTemperatureValue(activeBiome));
+        return builder;
+    }
+
+    private void appendAttributeLine(SpannableStringBuilder builder, String label, int rawValue) {
+        int value = clamp(rawValue, ATTRIBUTE_MIN, ATTRIBUTE_MAX);
+        builder.append(label)
+                .append("=")
+                .append(String.valueOf(value))
+                .append(" ")
+                .append(buildBar(value));
+        if (!"Temperatura".contentEquals(label)) {
+            builder.append("\n");
+        }
+    }
+
+    private int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    private String buildBar(int value) {
+        StringBuilder bar = new StringBuilder(ATTRIBUTE_MAX + 2);
+        bar.append("[");
+        for (int i = 0; i < ATTRIBUTE_MAX; i++) {
+            bar.append(i < value ? "█" : "░");
+        }
+        bar.append("]");
+        return bar.toString();
+    }
+
+    private CharSequence createTokenDots(int amount, int color) {
+        int dots = Math.max(0, amount);
+        if (dots == 0) {
+            return "-";
+        }
+        SpannableStringBuilder dotsBuilder = new SpannableStringBuilder();
+        for (int i = 0; i < dots; i++) {
+            SpannableString dot = new SpannableString("●");
+            dot.setSpan(new ForegroundColorSpan(color), 0, dot.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            dotsBuilder.append(dot);
+            if (i < dots - 1) {
+                dotsBuilder.append(" ");
+            }
+        }
+        return dotsBuilder;
+    }
+
+    private int getBiomeTemperatureValue(GameCard biome) {
+        if (biome == null || biome.description == null) {
+            return 0;
+        }
+        int idx = biome.description.indexOf("Temperatura:");
+        if (idx < 0) {
+            return 0;
+        }
+        String sub = biome.description.substring(idx).replace("Temperatura:", "").trim();
+        String value = sub.split("\\|")[0].trim();
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
     }
 
     private static class SpeciesRef {
