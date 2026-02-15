@@ -30,6 +30,10 @@ public class PlayActivity extends AppCompatActivity {
     private TextView biomeLabel;
     private TextView humanHandLabel;
     private TextView humanSpeciesLabel;
+    private TextView bot1DeckLabel;
+    private TextView bot2DeckLabel;
+    private TextView bot1SpeciesLabel;
+    private TextView bot2SpeciesLabel;
     private TextView scoreboardLabel;
     private TextView logLabel;
 
@@ -49,6 +53,10 @@ public class PlayActivity extends AppCompatActivity {
         biomeLabel = findViewById(R.id.biomeLabel);
         humanHandLabel = findViewById(R.id.humanHandLabel);
         humanSpeciesLabel = findViewById(R.id.humanSpeciesLabel);
+        bot1DeckLabel = findViewById(R.id.bot1DeckLabel);
+        bot2DeckLabel = findViewById(R.id.bot2DeckLabel);
+        bot1SpeciesLabel = findViewById(R.id.bot1SpeciesLabel);
+        bot2SpeciesLabel = findViewById(R.id.bot2SpeciesLabel);
         scoreboardLabel = findViewById(R.id.scoreboardLabel);
         logLabel = findViewById(R.id.logLabel);
 
@@ -430,9 +438,23 @@ public class PlayActivity extends AppCompatActivity {
         biomeLabel.setText(getString(R.string.play_biome, activeBiome == null ? "N/D" : activeBiome.name));
 
         PlayerState human = players.get(0);
+        PlayerState bot1 = players.get(1);
+        PlayerState bot2 = players.get(2);
         humanHandLabel.setText(formatHand(human));
         humanSpeciesLabel.setText(formatSpecies(human));
+        bot1DeckLabel.setText(formatDeck(bot1));
+        bot2DeckLabel.setText(formatDeck(bot2));
+        bot1SpeciesLabel.setText(formatSpecies(bot1));
+        bot2SpeciesLabel.setText(formatSpecies(bot2));
         scoreboardLabel.setText(formatScoreboard());
+    }
+
+    private String formatDeck(PlayerState player) {
+        return String.format(Locale.US, "%s\n• Mazo: %d\n• Mano: %d\n• Puntos: %d",
+                player.name,
+                player.deck.size(),
+                player.hand.size(),
+                player.score);
     }
 
     private String formatHand(PlayerState player) {
@@ -451,9 +473,13 @@ public class PlayActivity extends AppCompatActivity {
 
     private String formatSpecies(PlayerState player) {
         StringBuilder builder = new StringBuilder();
-        builder.append(getString(R.string.play_species_title)).append("\n");
+        if (player.human) {
+            builder.append(getString(R.string.play_species_title)).append("\n");
+        } else {
+            builder.append("Especies de ").append(player.name).append("\n");
+        }
         if (player.species.isEmpty()) {
-            builder.append("- aún no tienes especies");
+            builder.append(player.human ? "- aún no tienes especies" : "- sin especies en juego");
             return builder.toString();
         }
         for (int i = 0; i < player.species.size(); i++) {
