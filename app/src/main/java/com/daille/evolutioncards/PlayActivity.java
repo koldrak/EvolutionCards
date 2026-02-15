@@ -1,6 +1,9 @@
 package com.daille.evolutioncards;
 
 import android.os.Bundle;
+import android.util.TypedValue;
+import android.view.View;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AlertDialog;
@@ -9,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.button.MaterialButton;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -25,6 +29,8 @@ public class PlayActivity extends AppCompatActivity {
     private final Random random = new Random();
     private final List<PlayerState> players = new ArrayList<>();
     private final List<GameCard> biomeDeck = new ArrayList<>();
+    private final List<SpeciesRef> forageParticipants = new ArrayList<>();
+    private final List<SpeciesRef> attackParticipants = new ArrayList<>();
 
     private TextView turnLabel;
     private TextView biomeLabel;
@@ -42,10 +48,18 @@ public class PlayActivity extends AppCompatActivity {
     private TextView bot2Species2Label;
     private TextView bot2Species3Label;
     private TextView logLabel;
+    private LinearLayout forageTokensContainer;
+    private LinearLayout messageOverlay;
+    private TextView messageOverlayText;
+    private MaterialButton buttonContinueMessage;
+
+    private final ArrayDeque<String> pendingMessages = new ArrayDeque<>();
+    private boolean messageVisible = false;
 
     private int currentPlayer = 0;
     private int round = 1;
     private GameCard activeBiome;
+    private Phase currentPhase = Phase.PLAYER_ACTION;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -71,6 +85,10 @@ public class PlayActivity extends AppCompatActivity {
         bot2Species2Label = findViewById(R.id.bot2Species2Label);
         bot2Species3Label = findViewById(R.id.bot2Species3Label);
         logLabel = findViewById(R.id.logLabel);
+        forageTokensContainer = findViewById(R.id.forageTokensContainer);
+        messageOverlay = findViewById(R.id.messageOverlay);
+        messageOverlayText = findViewById(R.id.messageOverlayText);
+        buttonContinueMessage = findViewById(R.id.buttonContinueMessage);
 
         MaterialButton createSpeciesButton = findViewById(R.id.buttonCreateSpecies);
         MaterialButton replaceCardButton = findViewById(R.id.buttonReplaceCard);
@@ -89,6 +107,8 @@ public class PlayActivity extends AppCompatActivity {
             appendLog("Humano pasa su acción.");
             endHumanTurn();
         });
+
+        buttonContinueMessage.setOnClickListener(v -> showNextPendingMessage());
 
         setupGame();
         refreshUi();
@@ -116,15 +136,18 @@ public class PlayActivity extends AppCompatActivity {
             players.add(state);
         }
 
+        beginPhase(Phase.PLAYER_ACTION, "Ronda 1 lista. Elige una acción: crear especie, reemplazar carta o pasar.");
         appendLog("Partida iniciada. Se generaron 3 mazos aleatorios (1 humano + 2 bots).");
     }
 
     private void endHumanTurn() {
+        beginPhase(Phase.PLAYER_ACTION, "Turno de bots: observa sus acciones.");
         currentPlayer = 1;
         runBotsUntilRoundEnds();
         resolveEndOfRound();
         currentPlayer = 0;
         round++;
+        beginPhase(Phase.PLAYER_ACTION, "Tu turno: elige una acción.");
         refreshUi();
     }
 
@@ -137,15 +160,21 @@ public class PlayActivity extends AppCompatActivity {
     private void runBotAction(PlayerState bot) {
         boolean created = tryCreateSpecies(bot);
         if (created) {
-            appendLog(bot.name + " crea una nueva especie.");
+            String msg = bot.name + " crea una nueva especie.";
+            appendLog(msg);
+            showMessage(msg);
             return;
         }
         boolean replaced = tryReplaceCard(bot);
         if (replaced) {
-            appendLog(bot.name + " reemplaza una carta de adaptación.");
+            String msg = bot.name + " reemplaza una carta de adaptación.";
+            appendLog(msg);
+            showMessage(msg);
             return;
         }
-        appendLog(bot.name + " pasa su acción.");
+        String msg = bot.name + " pasa su acción.";
+        appendLog(msg);
+        showMessage(msg);
     }
 
     private void humanActionCreateSpecies() {
@@ -307,12 +336,21 @@ public class PlayActivity extends AppCompatActivity {
     }
 
     private void resolveEndOfRound() {
-        appendLog("--- Ronda " + round + ": forrajeo ---");
+        forageParticipants.clear();
+        attackParticipants.clear();
+
+        beginPhase(Phase.FORAGE, "Se reparte comida en la zona de forraje y comen por velocidad.");
         int foragePool = random.nextInt(10) + 1;
-        appendLog("Zona de forraje: " + foragePool + " comida.");
+        renderForageTokens(foragePool);
+        String diceMessage = "Resultado del dado: " + foragePool + ". Se agregan fichas de alimento a la zona de forraje.";
+        appendLog(diceMessage);
+        showMessage(diceMessage);
 
         List<SpeciesRef> allSpecies = collectSpecies();
-        allSpecies.sort(Comparator.comparingInt((SpeciesRef ref) -> ref.species.getSpeed()).reversed());
+        allSpecies.sort(Comparator
+                .comparingInt((SpeciesRef ref) -> ref.species.getSpeed())
+                .thenComparingInt(ref -> ref.species.getTotalAttributes())
+                .reversed());
 
         for (SpeciesRef ref : allSpecies) {
             if (foragePool <= 0) {
@@ -321,17 +359,29 @@ public class PlayActivity extends AppCompatActivity {
             int gain = Math.min(Math.max(1, ref.species.getAttack()), foragePool);
             ref.species.food += gain;
             foragePool -= gain;
-            appendLog(ref.player.name + " forrajea +" + gain + " comida.");
+            forageParticipants.add(ref);
+            renderForageTokens(foragePool);
+            String feedMessage = ref.player.name + " forrajea +" + gain + " comida (quedan " + foragePool + ").";
+            appendLog(feedMessage);
+            showMessage(feedMessage);
+        }
+        if (forageParticipants.isEmpty()) {
+            appendLog("Ninguna especie logró comer en forrajeo.");
+            showMessage("Ninguna especie logró comer en forrajeo.");
         }
 
-        appendLog("--- Depredación ---");
+        beginPhase(Phase.PREDATION, "Las especies con ataque intentan cazar.");
         for (SpeciesRef attackerRef : allSpecies) {
             SpeciesState attacker = attackerRef.species;
             if (attacker.getAttack() <= 0) {
                 continue;
             }
             SpeciesRef target = chooseTarget(attackerRef);
+            attackParticipants.add(attackerRef);
             if (target == null) {
+                String noTargetMessage = attackerRef.player.name + " no tiene objetivos válidos para depredar.";
+                appendLog(noTargetMessage);
+                showMessage(noTargetMessage);
                 continue;
             }
 
@@ -349,48 +399,88 @@ public class PlayActivity extends AppCompatActivity {
                 target.species.health -= damage;
                 attacker.food += attacker.getAttack();
                 attackerRef.player.score += attacker.getAttack();
-                appendLog(attackerRef.player.name + " depreda a " + target.player.name + " por " + damage + " de daño.");
+                String attackMessage = attackerRef.player.name + " depreda a " + target.player.name + " por " + damage + " de daño.";
+                appendLog(attackMessage);
+                showMessage(attackMessage);
             } else {
-                appendLog(attackerRef.player.name + " falla ataque sobre " + target.player.name + ".");
+                String failMessage = attackerRef.player.name + " falla ataque sobre " + target.player.name + ".";
+                appendLog(failMessage);
+                showMessage(failMessage);
             }
         }
 
-        appendLog("--- Resolución y reproducción ---");
+        beginPhase(Phase.RESOLUTION, "Cada especie consume metabolismo y se resuelven bajas.");
         for (PlayerState player : players) {
             for (int i = player.species.size() - 1; i >= 0; i--) {
                 SpeciesState species = player.species.get(i);
+                String speciesName = "Especie " + (i + 1) + " de " + player.name;
                 int metabolism = species.getMetabolism(activeBiome);
                 species.food -= metabolism;
+                appendLog(speciesName + " consume " + metabolism + " comida por metabolismo.");
 
-                if (species.health < 1 || species.food < 1) {
+                boolean starvation = species.food < 1;
+                boolean lowHealth = species.health < 1;
+                if (lowHealth || starvation) {
                     species.individuals -= 1;
                     species.food = Math.max(0, species.food);
                     species.health = Math.max(1, species.individuals);
-                    appendLog(player.name + " pierde 1 individuo por daño/hambre.");
+                    String lossMessage;
+                    if (starvation) {
+                        lossMessage = speciesName + " pierde 1 individuo por falta de alimentación.";
+                    } else {
+                        lossMessage = speciesName + " pierde 1 individuo por daño.";
+                    }
+                    appendLog(lossMessage);
+                    showMessage(lossMessage);
                 }
 
                 if (species.individuals < 1) {
                     player.species.remove(i);
-                    appendLog(player.name + " pierde una especie (extinta).");
+                    String extinctionMessage;
+                    if (starvation) {
+                        extinctionMessage = speciesName + " falleció por falta de alimentación.";
+                    } else {
+                        extinctionMessage = speciesName + " se extinguió por daño acumulado.";
+                    }
+                    appendLog(extinctionMessage);
+                    showMessage(extinctionMessage);
                     continue;
                 }
 
+                species.health = Math.max(species.health, species.individuals);
+            }
+        }
+
+        beginPhase(Phase.REPRODUCTION, "Las especies con comida suficiente se reproducen.");
+        for (PlayerState player : players) {
+            for (int i = 0; i < player.species.size(); i++) {
+                SpeciesState species = player.species.get(i);
                 int fertility = Math.max(1, species.individuals);
                 if (species.food >= fertility) {
                     species.food -= fertility;
                     species.individuals += 1;
                     species.health = Math.max(species.health, species.individuals);
                     player.score += 5;
-                    appendLog(player.name + " reproduce una especie (+1 individuo).");
+                    String reproductionMessage = "Especie " + (i + 1) + " de " + player.name + " se reprodujo (+1 individuo).";
+                    appendLog(reproductionMessage);
+                    showMessage(reproductionMessage);
                 }
+            }
+        }
 
+        beginPhase(Phase.REPLENISHMENT, "Se reponen manos y se actualiza puntaje.");
+        for (PlayerState player : players) {
+            for (SpeciesState species : player.species) {
                 player.score += species.food;
                 player.score += species.cards.size();
             }
+            int previousHand = player.hand.size();
             player.drawTo(HAND_TARGET);
+            appendLog(player.name + " repone mano: " + previousHand + " → " + player.hand.size() + " cartas. Puntaje: " + player.score + ".");
         }
 
         maybeAdvanceBiome();
+        refreshUi();
     }
 
     private void maybeAdvanceBiome() {
@@ -415,7 +505,7 @@ public class PlayActivity extends AppCompatActivity {
             if (ref.player == attacker.player) {
                 continue;
             }
-            if (ref.species.food > 0) {
+            if (wasInForageOrAttack(ref.species)) {
                 validTargets.add(ref);
             }
         }
@@ -423,6 +513,20 @@ public class PlayActivity extends AppCompatActivity {
             return null;
         }
         return validTargets.get(random.nextInt(validTargets.size()));
+    }
+
+    private boolean wasInForageOrAttack(SpeciesState species) {
+        for (SpeciesRef ref : forageParticipants) {
+            if (ref.species == species) {
+                return true;
+            }
+        }
+        for (SpeciesRef ref : attackParticipants) {
+            if (ref.species == species) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private List<SpeciesRef> collectSpecies() {
@@ -439,6 +543,64 @@ public class PlayActivity extends AppCompatActivity {
         return "Mandíbula".equalsIgnoreCase(card.type);
     }
 
+    private void beginPhase(Phase phase, String instruction) {
+        currentPhase = phase;
+        clearLog();
+        appendLog("--- Ronda " + round + " · " + phase.label + " ---");
+        appendLog(instruction);
+        showMessage(phase.label + ": " + instruction);
+        if (phase != Phase.FORAGE) {
+            renderForageTokens(0);
+        }
+        refreshUi();
+    }
+
+    private void clearLog() {
+        logLabel.setText("");
+    }
+
+    private void showMessage(String message) {
+        pendingMessages.add(message);
+        if (!messageVisible) {
+            showNextPendingMessage();
+        }
+    }
+
+    private void showNextPendingMessage() {
+        String nextMessage = pendingMessages.poll();
+        if (nextMessage == null) {
+            messageVisible = false;
+            messageOverlay.setVisibility(View.GONE);
+            return;
+        }
+        messageVisible = true;
+        messageOverlayText.setText(nextMessage);
+        messageOverlay.setVisibility(View.VISIBLE);
+    }
+
+    private void renderForageTokens(int tokenCount) {
+        if (forageTokensContainer == null) {
+            return;
+        }
+        forageTokensContainer.removeAllViews();
+        for (int i = 0; i < tokenCount; i++) {
+            View tokenView = new View(this);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dpToPx(22), 1f);
+            params.setMargins(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2));
+            tokenView.setLayoutParams(params);
+            tokenView.setBackgroundResource(R.drawable.bg_food_token);
+            forageTokensContainer.addView(tokenView);
+        }
+    }
+
+    private int dpToPx(int dp) {
+        return (int) TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP,
+                dp,
+                getResources().getDisplayMetrics()
+        );
+    }
+
     private void appendLog(String message) {
         CharSequence current = logLabel.getText();
         String next = (current == null || current.length() == 0) ? message : current + "\n" + message;
@@ -446,7 +608,7 @@ public class PlayActivity extends AppCompatActivity {
     }
 
     private void refreshUi() {
-        turnLabel.setText(getString(R.string.play_hand_area_title));
+        turnLabel.setText(getString(R.string.play_turn_phase, round, currentPhase.label));
         biomeLabel.setText(getString(R.string.play_forage_zone, activeBiome == null ? "N/D" : activeBiome.name));
 
         PlayerState human = players.get(0);
@@ -591,6 +753,10 @@ public class PlayActivity extends AppCompatActivity {
             return perception;
         }
 
+        int getTotalAttributes() {
+            return getAttack() + getSpeed() + getArmor() + getPerception();
+        }
+
         int getMetabolism(GameCard biome) {
             int metabolism = Math.max(1, individuals);
             int biomeTemp = 0;
@@ -637,6 +803,21 @@ public class PlayActivity extends AppCompatActivity {
             int idx = replaceable.get(random.nextInt(replaceable.size()));
             cards.set(idx, replacement);
             return true;
+        }
+    }
+
+    private enum Phase {
+        PLAYER_ACTION("Fase del jugador"),
+        FORAGE("Fase de forrajeo"),
+        PREDATION("Fase de depredación"),
+        RESOLUTION("Fase de resolución"),
+        REPRODUCTION("Fase de reproducción"),
+        REPLENISHMENT("Fase de reposición");
+
+        final String label;
+
+        Phase(String label) {
+            this.label = label;
         }
     }
 }
