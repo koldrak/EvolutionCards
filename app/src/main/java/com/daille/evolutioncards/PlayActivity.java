@@ -49,7 +49,6 @@ public class PlayActivity extends AppCompatActivity {
     private final List<SpeciesRef> forageParticipants = new ArrayList<>();
     private final List<SpeciesRef> attackParticipants = new ArrayList<>();
 
-    private TextView turnLabel;
     private TextView biomeLabel;
     private TextView biomeEffectsLabel;
     private TextView humanSpecies1Label;
@@ -93,7 +92,6 @@ public class PlayActivity extends AppCompatActivity {
             getSupportActionBar().hide();
         }
 
-        turnLabel = findViewById(R.id.turnLabel);
         biomeLabel = findViewById(R.id.biomeLabel);
         biomeEffectsLabel = findViewById(R.id.biomeEffectsLabel);
         humanSpecies1Label = findViewById(R.id.humanSpecies1Label);
@@ -891,7 +889,6 @@ public class PlayActivity extends AppCompatActivity {
     }
 
     private void refreshUi() {
-        turnLabel.setText(getString(R.string.play_turn_phase, round, currentPhase.label));
         biomeLabel.setText(getString(R.string.play_forage_zone, activeBiome == null ? "N/D" : activeBiome.name));
         biomeEffectsLabel.setText(getBiomeEffectsText());
 
