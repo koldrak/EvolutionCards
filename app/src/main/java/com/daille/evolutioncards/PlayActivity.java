@@ -781,7 +781,7 @@ public class PlayActivity extends AppCompatActivity {
         TextView stats = panel.findViewById(R.id.detailCardStats);
         TextView ability = panel.findViewById(R.id.detailCardAbility);
 
-        CardDesignDetails.DesignCardInfo designInfo = CardDesignDetails.findByGameCard(this, card);
+        CardDesignDetails.DesignCardInfo designInfo = CardDesignDetails.findByGameCard(card);
 
         title.setText(card.id + " · " + card.name);
         type.setText("Tipo: " + card.type);
