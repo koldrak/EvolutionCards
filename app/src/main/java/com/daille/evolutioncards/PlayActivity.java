@@ -51,6 +51,7 @@ public class PlayActivity extends AppCompatActivity {
 
     private TextView turnLabel;
     private TextView biomeLabel;
+    private TextView biomeEffectsLabel;
     private TextView humanSpecies1Label;
     private TextView humanSpecies2Label;
     private TextView humanSpecies3Label;
@@ -71,7 +72,9 @@ public class PlayActivity extends AppCompatActivity {
     private TextView[] humanHandCardViews;
 
     private final ArrayDeque<String> pendingMessages = new ArrayDeque<>();
+    private final ArrayDeque<PhaseStep> pendingRoundPhases = new ArrayDeque<>();
     private boolean messageVisible = false;
+    private Runnable onMessagesDrained;
     private int playerCount = DEFAULT_PLAYER_COUNT;
     private boolean gameOver = false;
 
@@ -92,6 +95,7 @@ public class PlayActivity extends AppCompatActivity {
 
         turnLabel = findViewById(R.id.turnLabel);
         biomeLabel = findViewById(R.id.biomeLabel);
+        biomeEffectsLabel = findViewById(R.id.biomeEffectsLabel);
         humanSpecies1Label = findViewById(R.id.humanSpecies1Label);
         humanSpecies2Label = findViewById(R.id.humanSpecies2Label);
         humanSpecies3Label = findViewById(R.id.humanSpecies3Label);
@@ -140,7 +144,7 @@ public class PlayActivity extends AppCompatActivity {
             if (gameOver) {
                 return;
             }
-            appendLog("Humano pasa su acción.");
+            humanActionDiscardHand();
             endHumanTurn();
         });
 
@@ -185,7 +189,7 @@ public class PlayActivity extends AppCompatActivity {
             players.add(state);
         }
 
-        beginPhase(Phase.PLAYER_ACTION, "Ronda 1 lista. Elige una acción: crear especie, reemplazar carta o pasar.");
+        beginPhase(Phase.PLAYER_ACTION, "Ronda 1 lista. Elige una acción: crear especie, reemplazar carta o descartar mano.");
         appendLog("Partida iniciada. Se generaron " + playerCount + " mazos aleatorios.");
     }
 
@@ -197,14 +201,6 @@ public class PlayActivity extends AppCompatActivity {
         currentPlayer = 1;
         runBotsUntilRoundEnds();
         resolveEndOfRound();
-        if (gameOver) {
-            refreshUi();
-            return;
-        }
-        currentPlayer = 0;
-        round++;
-        beginPhase(Phase.PLAYER_ACTION, "Tu turno: elige una acción.");
-        refreshUi();
     }
 
     private void runBotsUntilRoundEnds() {
@@ -321,6 +317,14 @@ public class PlayActivity extends AppCompatActivity {
         }
     }
 
+    private void humanActionDiscardHand() {
+        PlayerState human = players.get(0);
+        int discardedCards = human.hand.size();
+        human.hand.clear();
+        human.drawTo(HAND_TARGET);
+        appendLog("Humano descarta su mano (" + discardedCards + " cartas) y roba " + human.hand.size() + " cartas nuevas.");
+    }
+
     private boolean tryCreateSpecies(PlayerState player) {
         if (player.species.size() >= MAX_SPECIES || player.hand.size() < 2) {
             return false;
@@ -410,7 +414,58 @@ public class PlayActivity extends AppCompatActivity {
         attackParticipants.clear();
         clearRoundCombatMarkers();
 
-        beginPhase(Phase.FORAGE, "Se reparte comida en la zona de forraje y comen por velocidad.");
+        pendingRoundPhases.clear();
+        pendingRoundPhases.add(new PhaseStep(Phase.FORAGE,
+                "Se reparte comida en la zona de forraje y comen por velocidad.",
+                this::resolveForagePhase));
+        pendingRoundPhases.add(new PhaseStep(Phase.PREDATION,
+                "Las especies con ataque intentan cazar.",
+                this::resolvePredationPhase));
+        pendingRoundPhases.add(new PhaseStep(Phase.RESOLUTION,
+                "Cada especie consume metabolismo y se resuelven bajas.",
+                this::resolveResolutionPhase));
+        pendingRoundPhases.add(new PhaseStep(Phase.REPRODUCTION,
+                "Las especies con comida suficiente se reproducen.",
+                this::resolveReproductionPhase));
+        pendingRoundPhases.add(new PhaseStep(Phase.REPLENISHMENT,
+                "Se reponen manos y se actualiza puntaje.",
+                this::resolveReplenishmentPhase));
+        advanceRoundResolution();
+    }
+
+    private void advanceRoundResolution() {
+        PhaseStep nextPhase = pendingRoundPhases.poll();
+        if (nextPhase == null) {
+            maybeAdvanceBiome();
+            checkGameOver();
+            refreshUi();
+            if (gameOver) {
+                return;
+            }
+            currentPlayer = 0;
+            round++;
+            beginPhase(Phase.PLAYER_ACTION, "Tu turno: elige una acción.");
+            refreshUi();
+            return;
+        }
+
+        beginPhase(nextPhase.phase, nextPhase.instruction);
+        showMessage("Pulsa continuar para resolver esta fase.");
+        onMessagesDrained = () -> {
+            nextPhase.resolver.run();
+            refreshUi();
+            onMessagesDrained = this::advanceRoundResolution;
+            if (!messageVisible && pendingMessages.isEmpty()) {
+                Runnable callback = onMessagesDrained;
+                onMessagesDrained = null;
+                if (callback != null) {
+                    callback.run();
+                }
+            }
+        };
+    }
+
+    private void resolveForagePhase() {
         int foragePool = random.nextInt(10) + 1;
         renderForageTokens(foragePool);
         String diceMessage = "Resultado del dado: " + foragePool + ". Se agregan fichas de alimento a la zona de forraje.";
@@ -443,8 +498,15 @@ public class PlayActivity extends AppCompatActivity {
             appendLog("Ninguna especie logró comer en forrajeo.");
             showMessage("Ninguna especie logró comer en forrajeo.");
         }
+    }
 
-        beginPhase(Phase.PREDATION, "Las especies con ataque intentan cazar.");
+    private void resolvePredationPhase() {
+        List<SpeciesRef> allSpecies = collectSpecies();
+        allSpecies.sort(Comparator
+                .comparingInt((SpeciesRef ref) -> ref.species.getSpeed())
+                .thenComparingInt(ref -> ref.species.getTotalAttributes())
+                .reversed());
+
         for (SpeciesRef attackerRef : allSpecies) {
             SpeciesState attacker = attackerRef.species;
             if (!attacker.canAttack()) {
@@ -484,8 +546,9 @@ public class PlayActivity extends AppCompatActivity {
                 showMessage(failMessage);
             }
         }
+    }
 
-        beginPhase(Phase.RESOLUTION, "Cada especie consume metabolismo y se resuelven bajas.");
+    private void resolveResolutionPhase() {
         for (PlayerState player : players) {
             for (int i = player.species.size() - 1; i >= 0; i--) {
                 SpeciesState species = player.species.get(i);
@@ -536,8 +599,9 @@ public class PlayActivity extends AppCompatActivity {
                 species.trimNonJawToIndividuals(random);
             }
         }
+    }
 
-        beginPhase(Phase.REPRODUCTION, "Las especies con comida suficiente se reproducen.");
+    private void resolveReproductionPhase() {
         for (PlayerState player : players) {
             for (int i = 0; i < player.species.size(); i++) {
                 SpeciesState species = player.species.get(i);
@@ -553,8 +617,9 @@ public class PlayActivity extends AppCompatActivity {
                 }
             }
         }
+    }
 
-        beginPhase(Phase.REPLENISHMENT, "Se reponen manos y se actualiza puntaje.");
+    private void resolveReplenishmentPhase() {
         for (PlayerState player : players) {
             for (SpeciesState species : player.species) {
                 player.score += species.food;
@@ -565,10 +630,6 @@ public class PlayActivity extends AppCompatActivity {
             player.drawTo(HAND_TARGET);
             appendLog(player.name + " repone mano: " + previousHand + " → " + player.hand.size() + " cartas. Puntaje: " + player.score + ".");
         }
-
-        maybeAdvanceBiome();
-        checkGameOver();
-        refreshUi();
     }
 
     private void clearRoundCombatMarkers() {
@@ -780,6 +841,11 @@ public class PlayActivity extends AppCompatActivity {
         if (nextMessage == null) {
             messageVisible = false;
             messageOverlay.setVisibility(View.GONE);
+            if (onMessagesDrained != null) {
+                Runnable callback = onMessagesDrained;
+                onMessagesDrained = null;
+                callback.run();
+            }
             return;
         }
         messageVisible = true;
@@ -811,6 +877,13 @@ public class PlayActivity extends AppCompatActivity {
         );
     }
 
+    private String getBiomeEffectsText() {
+        if (activeBiome == null || activeBiome.description == null || activeBiome.description.trim().isEmpty()) {
+            return "Sin efectos de bioma activos.";
+        }
+        return "Efectos: " + activeBiome.description.replace("|", " · ");
+    }
+
     private void appendLog(String message) {
         CharSequence current = logLabel.getText();
         String next = (current == null || current.length() == 0) ? message : current + "\n" + message;
@@ -820,6 +893,7 @@ public class PlayActivity extends AppCompatActivity {
     private void refreshUi() {
         turnLabel.setText(getString(R.string.play_turn_phase, round, currentPhase.label));
         biomeLabel.setText(getString(R.string.play_forage_zone, activeBiome == null ? "N/D" : activeBiome.name));
+        biomeEffectsLabel.setText(getBiomeEffectsText());
 
         PlayerState human = players.get(0);
         PlayerState bot1 = players.size() > 1 ? players.get(1) : null;
@@ -1054,6 +1128,9 @@ public class PlayActivity extends AppCompatActivity {
         }
         StringBuilder builder = new StringBuilder();
         for (GameCard card : species.cards) {
+            CardDesignDetails.DesignCardInfo designInfo = CardDesignDetails.findByGameCard(card);
+            String statsText = buildStatsText(designInfo);
+            String abilityText = buildAbilityText(designInfo);
             builder.append("• ")
                     .append(card.id)
                     .append(" · ")
@@ -1063,6 +1140,12 @@ public class PlayActivity extends AppCompatActivity {
                     .append(")\n")
                     .append("   ")
                     .append(card.description)
+                    .append("\n")
+                    .append("   Estadísticas: ")
+                    .append(statsText.isEmpty() ? "No modifica estadísticas." : statsText)
+                    .append("\n")
+                    .append("   Habilidad: ")
+                    .append(abilityText)
                     .append("\n");
         }
         return builder.toString().trim();
@@ -1483,6 +1566,18 @@ public class PlayActivity extends AppCompatActivity {
             RULES.put("A13", TargetRule.LOWEST_PERCEPTION);
             RULES.put("A14", TargetRule.LOWEST_DEFENSE);
             RULES.put("A15", TargetRule.LOWEST_DEFENSE);
+        }
+    }
+
+    private static class PhaseStep {
+        final Phase phase;
+        final String instruction;
+        final Runnable resolver;
+
+        PhaseStep(Phase phase, String instruction, Runnable resolver) {
+            this.phase = phase;
+            this.instruction = instruction;
+            this.resolver = resolver;
         }
     }
 
