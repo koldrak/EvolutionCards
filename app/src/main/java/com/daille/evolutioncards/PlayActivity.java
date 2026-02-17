@@ -750,6 +750,7 @@ public class PlayActivity extends AppCompatActivity {
                 }
                 if (lowHealth || starvation) {
                     species.individuals -= 1;
+                    grantScavengerFoodBonus();
                     species.food = Math.max(0, species.food);
                     species.health = species.getAdaptationHealth();
                     species.clearStatuses();
@@ -781,6 +782,19 @@ public class PlayActivity extends AppCompatActivity {
 
                 species.trimNonJawToIndividuals(random);
                 species.health = species.getAdaptationHealth();
+            }
+        }
+    }
+
+    private void grantScavengerFoodBonus() {
+        for (SpeciesRef ref : collectSpecies()) {
+            if (ref.species.hasAbilityText("obtiene mas 1 de alimento cada vez que un individuo es eliminado")
+                    || ref.species.hasAbilityText("obtiene más 1 de alimento cada vez que un individuo es eliminado")) {
+                ref.species.food += 1;
+                String message = getSpeciesLabel(ref)
+                        + " activa Mandíbula Trituradora y obtiene +1 comida por eliminación de individuo.";
+                appendLog(message);
+                showMessage(message);
             }
         }
     }
@@ -1056,6 +1070,43 @@ public class PlayActivity extends AppCompatActivity {
                 appendLog(message);
                 showMessage(message);
             }
+            if (species.forageSuccessThisRound
+                    && (species.hasCard("A108")
+                    || species.hasAbilityText("puedes repartir la comida obtenida entre 2 especies aliadas herbivoras adyacentes"))) {
+                applyAdjacentHerbivoreForageShare(ref);
+            }
+        }
+    }
+
+    private void applyAdjacentHerbivoreForageShare(SpeciesRef sourceRef) {
+        PlayerState owner = sourceRef.player;
+        int sourceIndex = owner.species.indexOf(sourceRef.species);
+        if (sourceIndex < 0) {
+            return;
+        }
+
+        int shared = 0;
+        int[] adjacentIndexes = new int[]{sourceIndex - 1, sourceIndex + 1};
+        for (int idx : adjacentIndexes) {
+            if (idx < 0 || idx >= owner.species.size()) {
+                continue;
+            }
+            SpeciesState ally = owner.species.get(idx);
+            if (ally.getDietType() == DietType.CARNIVORE) {
+                continue;
+            }
+            ally.food += 1;
+            shared += 1;
+            if (shared >= 2) {
+                break;
+            }
+        }
+
+        if (shared > 0) {
+            String message = getSpeciesLabel(sourceRef)
+                    + " comparte alimento por Mandíbula Lofodonta (+" + shared + " comida a especies aliadas adyacentes).";
+            appendLog(message);
+            showMessage(message);
         }
     }
 
@@ -1723,7 +1774,7 @@ public class PlayActivity extends AppCompatActivity {
         }
 
         int getAttack() {
-            return Math.max(0, getBaseStat("attack") + getBiomeModifier("Ataque"));
+            return Math.max(0, getBaseStat("attack") + getBiomeModifier("Ataque") + getAbilityBasedStatModifier("attack"));
         }
 
         int getSpeed() {
@@ -1739,7 +1790,7 @@ public class PlayActivity extends AppCompatActivity {
         }
 
         int getArmor() {
-            return getBaseStat("armor") + getBiomeModifier("Armadura");
+            return getBaseStat("armor") + getBiomeModifier("Armadura") + getAbilityBasedStatModifier("armor");
         }
 
         int getPerception() {
@@ -1814,7 +1865,95 @@ public class PlayActivity extends AppCompatActivity {
                     && hasAbilityText("obtiene mas 2 de persepcion en manglar, arecife, playa y glaciares")) {
                 total += 2;
             }
+            total += getGenericBiomeListModifier(stat);
             return total;
+        }
+
+        private int getGenericBiomeListModifier(String stat) {
+            if (activeBiome == null || activeBiome.name == null) {
+                return 0;
+            }
+            int total = 0;
+            String normalizedActiveBiome = normalizeSimple(activeBiome.name);
+            String[] statTokens;
+            switch (stat) {
+                case "attack":
+                    statTokens = new String[]{"ataque"};
+                    break;
+                case "armor":
+                    statTokens = new String[]{"armadura"};
+                    break;
+                case "speed":
+                    statTokens = new String[]{"velocidad"};
+                    break;
+                case "perception":
+                    statTokens = new String[]{"percepcion"};
+                    break;
+                case "fertility":
+                    statTokens = new String[]{"fertilidad"};
+                    break;
+                case "metabolism":
+                    statTokens = new String[]{"metabolismo"};
+                    break;
+                default:
+                    statTokens = new String[0];
+                    break;
+            }
+            if (statTokens.length == 0) {
+                return 0;
+            }
+
+            Pattern valueInBiomes = Pattern.compile("([+-]?\\d+)\\s+de\\s+([a-záéíóúñ]+)\\s+en\\s+([^\\.|]+)");
+            for (GameCard card : cards) {
+                CardDesignDetails.DesignCardInfo info = CardDesignDetails.findByGameCard(card);
+                if (info == null || info.ability == null) {
+                    continue;
+                }
+                String ability = normalizeSimple(info.ability);
+                Matcher matcher = valueInBiomes.matcher(ability);
+                while (matcher.find()) {
+                    String statName = matcher.group(2);
+                    if (!matchesAnyToken(statName, statTokens)) {
+                        continue;
+                    }
+                    int amount = parseIntSafe(matcher.group(1));
+                    String biomeList = matcher.group(3);
+                    if (isBiomeIncludedInText(normalizedActiveBiome, biomeList)) {
+                        total += amount;
+                    } else if (biomeList.contains("otros biomas")) {
+                        total += amount;
+                    }
+                }
+            }
+            return total;
+        }
+
+        private boolean isBiomeIncludedInText(String activeBiomeNormalized, String biomeListText) {
+            String list = normalizeSimple(biomeListText)
+                    .replace("/", ",")
+                    .replace(" y ", ",")
+                    .replace(" e ", ",");
+            String[] parts = list.split(",");
+            for (String part : parts) {
+                String biomeToken = part.trim();
+                if (biomeToken.isEmpty() || "otros biomas".equals(biomeToken)) {
+                    continue;
+                }
+                if (activeBiomeNormalized.contains(biomeToken) || biomeToken.contains(activeBiomeNormalized)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private boolean matchesAnyToken(String candidate, String[] tokens) {
+            String normalizedCandidate = normalizeSimple(candidate);
+            for (String token : tokens) {
+                if (normalizedCandidate.contains(normalizeSimple(token))) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         boolean hasAbilityText(String fragment) {
@@ -1848,7 +1987,8 @@ public class PlayActivity extends AppCompatActivity {
         }
 
         int getFertility() {
-            return Math.max(1, individuals + getBaseStat("fertility") + getBiomeModifier("Fertilidad"));
+            return Math.max(1, individuals + getBaseStat("fertility") + getBiomeModifier("Fertilidad")
+                    + getAbilityBasedStatModifier("fertility"));
         }
 
         int getNonJawCardCount() {
@@ -2175,6 +2315,21 @@ public class PlayActivity extends AppCompatActivity {
         if (ability.contains("cura 2 punto de salud") && targetSpecies.health < targetSpecies.getAdaptationHealth()) {
             targetSpecies.health += 2;
         }
+        if (ability.contains("mira la mano de un rival") && ability.contains("ese rival la descarta")) {
+            PlayerState rival = chooseRandomEnemyPlayerWithCards(owner);
+            if (rival != null) {
+                GameCard discarded = rival.hand.remove(random.nextInt(rival.hand.size()));
+                appendLog(owner.name + " activa descarte de mano rival: " + rival.name
+                        + " descarta " + discarded.id + " · " + discarded.name + ".");
+            }
+        }
+        if (ability.contains("cambiar la carta de bioma activa por una al azar") && !biomeDeck.isEmpty()) {
+            GameCard previousBiome = activeBiome;
+            GameCard nextBiome = biomeDeck.get(random.nextInt(biomeDeck.size()));
+            activeBiome = nextBiome;
+            appendLog(owner.name + " cambia el bioma activo al jugar " + card.name + ": "
+                    + (previousBiome == null ? "(sin bioma)" : previousBiome.name) + " → " + nextBiome.name + ".");
+        }
 
         if ("A4".equals(cardId)) {
             owner.drawTo(Math.min(HAND_TARGET + 1, owner.hand.size() + 1));
@@ -2192,6 +2347,20 @@ public class PlayActivity extends AppCompatActivity {
         }
 
         targetSpecies.health = Math.min(targetSpecies.health, targetSpecies.getAdaptationHealth());
+    }
+
+    private PlayerState chooseRandomEnemyPlayerWithCards(PlayerState owner) {
+        List<PlayerState> candidates = new ArrayList<>();
+        for (PlayerState player : players) {
+            if (player == owner || player.hand.isEmpty()) {
+                continue;
+            }
+            candidates.add(player);
+        }
+        if (candidates.isEmpty()) {
+            return null;
+        }
+        return candidates.get(random.nextInt(candidates.size()));
     }
 
     private SpeciesRef chooseRandomEnemySpecies(PlayerState owner) {
