@@ -670,7 +670,17 @@ public class PlayActivity extends AppCompatActivity {
                 continue;
             }
 
+            appendLog(getSpeciesLabel(attackerRef)
+                    + " ataca primero con objetivo \"" + getAttackTargetDescription(attacker) + "\" a "
+                    + getSpeciesLabel(target) + ".");
+
             AttackResolution resolution = resolveAttack(attackerRef, target);
+            for (String detailLine : resolution.detailLines) {
+                appendLog(detailLine);
+            }
+            String attackDetailsForPlayer = resolution.detailLines.isEmpty()
+                    ? ""
+                    : "\n" + TextUtils.join("\n", resolution.detailLines);
             if (resolution.success) {
                 target.species.health -= resolution.damage;
                 if (resolution.damage > 0) {
@@ -687,7 +697,7 @@ public class PlayActivity extends AppCompatActivity {
                         + " pierde " + resolution.damage + " de salud y "
                         + getSpeciesLabel(attackerRef) + " recibe " + resolution.attackPower + " fichas de comida.";
                 appendLog(attackMessage);
-                showMessage(attackMessage);
+                showMessage(attackMessage + attackDetailsForPlayer);
             } else {
                 String failMessage = getSpeciesLabel(attackerRef)
                         + " ataca por " + resolution.modeLabel + " a " + getSpeciesLabel(target)
@@ -695,7 +705,7 @@ public class PlayActivity extends AppCompatActivity {
                 maybeApplyFailedAttackDefenderBonus(target.species, target);
                 maybeApplyFailedAttackTriggers(attackerRef, target);
                 appendLog(failMessage);
-                showMessage(failMessage);
+                showMessage(failMessage + attackDetailsForPlayer);
             }
         }
     }
@@ -1051,30 +1061,53 @@ public class PlayActivity extends AppCompatActivity {
     private AttackResolution resolveAttack(SpeciesRef attackerRef, SpeciesRef defenderRef) {
         SpeciesState attacker = attackerRef.species;
         SpeciesState defender = defenderRef.species;
+        List<String> detailLines = new ArrayList<>();
         String modeLabel;
         boolean success;
         int attackerSpeed = attacker.getSpeed();
         int defenderSpeed = defender.getSpeed();
+        int attackerPerception = attacker.getPerception();
+        int defenderPerception = defender.getPerception();
+        String coinResult = "no aplica";
 
         if (attacker.hasCard("A53") && attacker.isInAnyBiome("playa", "manglar")) {
             attackerSpeed += 2;
+            detailLines.add("- Bono de velocidad del atacante: +2 por A53 en Playa/Manglar ("
+                    + attackerSpeed + " total). ");
         }
 
-        if (attacker.getPerception() > defender.getPerception()) {
+        if (attackerPerception > defenderPerception) {
+            detailLines.add("- Se comparan sus atributos de percepción (atacante "
+                    + attackerPerception + " vs defensor " + defenderPerception + ") y gana el atacante.");
             if (random.nextBoolean()) {
                 modeLabel = "emboscada";
                 success = true;
+                coinResult = "cara";
             } else {
                 modeLabel = "huida con ventaja";
                 success = attackerSpeed > defenderSpeed + 2;
+                coinResult = "sello";
             }
+            detailLines.add("- Se lanza la moneda y sale \"" + coinResult + "\"; se resuelve ataque por "
+                    + modeLabel + ".");
         } else {
             modeLabel = "huida";
             success = attackerSpeed > defenderSpeed;
+            detailLines.add("- Se comparan sus atributos de percepción (atacante "
+                    + attackerPerception + " vs defensor " + defenderPerception + ") y no gana el atacante.");
+            detailLines.add("- No hay lanzamiento de moneda; se resuelve ataque por huida.");
+        }
+
+        if (!"emboscada".equals(modeLabel)) {
+            int requiredSpeed = "huida con ventaja".equals(modeLabel) ? defenderSpeed + 2 : defenderSpeed;
+            detailLines.add("- Se comparan sus atributos de velocidad (atacante " + attackerSpeed
+                    + " vs defensor " + requiredSpeed + ") y "
+                    + (success ? "gana el atacante." : "gana el defensor."));
         }
 
         if (defender.hasCard("A54") && !"emboscada".equals(modeLabel)) {
             success = false;
+            detailLines.add("- El defensor activa A54 y anula este intento de ataque por " + modeLabel + ".");
         }
 
         if ("emboscada".equals(modeLabel) && attacker.hasCard("A65")) {
@@ -1084,32 +1117,53 @@ public class PlayActivity extends AppCompatActivity {
                 attacker.health = Math.min(attacker.health, attacker.getAdaptationHealth());
                 appendLog(getSpeciesLabel(attackerRef)
                         + " activa Cola Señuelo: su emboscada es exitosa y descarta la adaptación.");
+                detailLines.add("- Cola Señuelo fuerza que la emboscada sea exitosa.");
             }
         }
 
         int attackPower = attacker.getAttack();
         if (attacker.hasCard("A15") || attacker.hasAbilityText("al atacar obtiene +1 de ataque")) {
             attackPower += 1;
+            detailLines.add("- El atacante obtiene +1 de ataque por habilidad/adaptación ofensiva.");
         }
         if (attacker.hasCard("A36") && defender.hasCardType("Alas")) {
             attackPower += 2;
+            detailLines.add("- El atacante obtiene +2 de ataque por A36 contra objetivo con Alas.");
         }
         int effectiveArmor = defender.getArmor();
         if (attacker.hasCard("A2") || attacker.hasAbilityText("ignora la armadura de la presa")) {
             effectiveArmor = 0;
+            detailLines.add("- El atacante ignora la armadura del defensor.");
         }
         if (defender.hasAbilityText("la primera vez que esta especie sea atacada cada ronda")
                 && !defender.wasFirstAttackDefenseUsedThisRound) {
             defender.wasFirstAttackDefenseUsedThisRound = true;
             attackPower = Math.max(0, attackPower - 1);
+            detailLines.add("- Defensa pasiva del defensor: reduce en 1 el ataque recibido por primera defensa de la ronda.");
         }
         if ("emboscada".equals(modeLabel)
                 && defender.hasAbilityText("si es atacado por emboscada recibe un bono de +2 de velocidad")) {
             success = (attackerSpeed > defenderSpeed + 2);
+            detailLines.add("- El defensor aplica bono +2 de velocidad contra emboscada ("
+                    + attackerSpeed + " vs " + (defenderSpeed + 2) + ").");
         }
 
         int damage = success ? Math.max(0, attackPower - (effectiveArmor / 2)) : 0;
-        return new AttackResolution(modeLabel, success, damage, attackPower);
+        detailLines.add("- Cálculo final: daño = max(0, ataque " + attackPower + " - armadura efectiva/2 "
+                + (effectiveArmor / 2) + ") => " + damage + ".");
+        return new AttackResolution(modeLabel, success, damage, attackPower, detailLines);
+    }
+
+    private String getAttackTargetDescription(SpeciesState species) {
+        if (species == null) {
+            return "No especificado";
+        }
+        GameCard jaw = species.getPrimaryJawCard();
+        CardDesignDetails.DesignCardInfo designInfo = CardDesignDetails.findByGameCard(jaw);
+        if (designInfo == null || isBlankOrDash(designInfo.attackTarget)) {
+            return "No especificado";
+        }
+        return designInfo.attackTarget;
     }
 
     private void maybeApplyAttackStatus(SpeciesState attacker, SpeciesState defender) {
@@ -2939,12 +2993,14 @@ public class PlayActivity extends AppCompatActivity {
         final boolean success;
         final int damage;
         final int attackPower;
+        final List<String> detailLines;
 
-        AttackResolution(String modeLabel, boolean success, int damage, int attackPower) {
+        AttackResolution(String modeLabel, boolean success, int damage, int attackPower, List<String> detailLines) {
             this.modeLabel = modeLabel;
             this.success = success;
             this.damage = damage;
             this.attackPower = attackPower;
+            this.detailLines = detailLines;
         }
     }
 
