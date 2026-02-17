@@ -814,6 +814,26 @@ public class PlayActivity extends AppCompatActivity {
             player.drawTo(HAND_TARGET);
             appendLog(player.name + " repone mano: " + previousHand + " → " + player.hand.size() + " cartas. Puntaje: " + player.score + ".");
         }
+
+        showMessage(buildScoreboardOverlayMessage());
+    }
+
+    private String buildScoreboardOverlayMessage() {
+        StringBuilder builder = new StringBuilder();
+        builder.append("📊 Puntajes al final de la ronda ").append(round).append("\n\n");
+        for (int i = 0; i < players.size(); i++) {
+            PlayerState player = players.get(i);
+            builder.append(i + 1)
+                    .append(") ")
+                    .append(player.name)
+                    .append(": ")
+                    .append(player.score)
+                    .append(" pts");
+            if (i < players.size() - 1) {
+                builder.append("\n");
+            }
+        }
+        return builder.toString();
     }
 
     private void clearRoundCombatMarkers() {
