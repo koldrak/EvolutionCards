@@ -30,11 +30,11 @@ A28,Escamas Plateadas,Parcial,Al jugarla: elige una especie rival; queda Confund
 A29,Piel Rugosa,Sin habilidad en diseño,,
 A30,Cobertura Estacional,Parcial,al jugarla el usuario selecciona si quiere subir o bajar la temperatura de la especie en 1 | En Tundra: +1 Armadura.,"Cambio de temperatura +/-1 se decide aleatorio, no por jugador."
 A31,Patas Saltadoras,Implementada,Al jugarla: roba 1 carta y luego descarta 1 carta.,
-A32,Garras Retráctiles,No implementada,Al jugarla: intercambia 2 cartas de tu mano con 2 cartas al azar de la mano de un rival. | En Montaña: +1 Velocidad.,No hay implementación específica del intercambio de 2x2.
+A32,Garras Retráctiles,Implementada,Al jugarla: intercambia 2 cartas de tu mano con 2 cartas al azar de la mano de un rival. | En Montaña: +1 Velocidad.,
 A33,Aletas Potentes,Implementada,manglares y arrecife +1 de velocidad,
 A34,Patas Excavadoras,Parcial,al jugarla el usuario selecciona si quiere subir o bajar la temperatura de la especie en 2 | En Estepa: +1 Velocidad.,"Cambio de temperatura +/-2 se decide aleatorio, no por jugador."
 A35,Membrana Planeadora,Implementada,En Taiga: +1 Velocidad.,
-A36,Alas Batientes,No implementada,+ 2 de ataque contra especies con alas. | En Montaña: +1 Velocidad.,No hay bonificación +2 ataque contra especies con alas.
+A36,Alas Batientes,Implementada,+ 2 de ataque contra especies con alas. | En Montaña: +1 Velocidad.,
 A37,Patas Largas,Parcial,Al jugarla: elige una especie; aumenta su fertilidad en +1 (permanente).,Especie objetivo para fertilidad se elige aleatoria.
 A38,Almohadillas Adhesivas,Implementada,+2 de velocidad en jungla y montaña. | En Montaña: +1 Velocidad.,
 A39,Extremidades Prensiles,Implementada,+2 de velocidad en jungla y bosque. | En Jungla: +1 Velocidad.,
@@ -96,7 +96,7 @@ A94,Metamorfosis Completa,Implementada,En Bosque: +1 Salud.,
 A95,Defensa Química,Implementada,Tras realizar una defensa su atacante queda confundido,
 A96,Regeneración Celular,Implementada,Al jugarla: cura 1 punto de salud de esta especie (si está dañada).,
 A97,Exhibición Intimidante,Parcial,Al jugarla: elige una especie rival; queda en Terror.,Especie rival en Terror se aplica aleatoriamente.
-A98,Simbiosis,No implementada,"Selecciona una especie, cada vez que alguna gane ""fichas de comida"" la otra tambien",No hay vínculo de simbiosis entre especies para compartir comida.
+A98,Simbiosis,Implementada,"Selecciona una especie, cada vez que alguna gane ""fichas de comida"" la otra tambien",
 A99,Resistencia a Toxinas,Implementada,inmunidad a todos los estados,
 A100,Especialización Dietaria,Implementada,"Mientras esté en juego: la primera vez que esta especie sea atacada cada ronda, el atacante pierde 1 velocidad para ese ataque.",
 A101,lengua extensible,Implementada,si golpea a la presa está queda paralizada,
