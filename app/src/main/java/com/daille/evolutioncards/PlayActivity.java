@@ -663,14 +663,15 @@ public class PlayActivity extends AppCompatActivity {
                     target.species.tookPredationDamageThisRound = true;
                     target.species.lastAttacker = attackerRef.player;
                 }
-                attacker.food += attacker.getAttack();
-                attackerRef.player.score += attacker.getAttack();
+                attacker.food += resolution.attackPower;
+                attackerRef.player.score += resolution.attackPower;
                 maybeApplyAttackStatus(attacker, target.species);
+                maybeApplyDefenseTriggersOnSuccessfulAttack(attackerRef, target, resolution);
                 String attackMessage = getSpeciesLabel(attackerRef)
                         + " ataca por " + resolution.modeLabel + " a " + getSpeciesLabel(target)
                         + ". Resultado ataque exitoso " + getSpeciesLabel(target)
                         + " pierde " + resolution.damage + " de salud y "
-                        + getSpeciesLabel(attackerRef) + " recibe " + attacker.getAttack() + " fichas de comida.";
+                        + getSpeciesLabel(attackerRef) + " recibe " + resolution.attackPower + " fichas de comida.";
                 appendLog(attackMessage);
                 showMessage(attackMessage);
             } else {
@@ -678,9 +679,33 @@ public class PlayActivity extends AppCompatActivity {
                         + " ataca por " + resolution.modeLabel + " a " + getSpeciesLabel(target)
                         + ". Resultado ataque fallido.";
                 maybeApplyFailedAttackDefenderBonus(target.species, target);
+                maybeApplyFailedAttackTriggers(attackerRef, target);
                 appendLog(failMessage);
                 showMessage(failMessage);
             }
+        }
+    }
+
+    private void maybeApplyDefenseTriggersOnSuccessfulAttack(SpeciesRef attackerRef, SpeciesRef defenderRef, AttackResolution resolution) {
+        SpeciesState attacker = attackerRef.species;
+        SpeciesState defender = defenderRef.species;
+        if (resolution.damage > 0 && defender.hasAbilityText("si es dañado por un ataque el atacante queda envenenado")) {
+            attacker.applyStatus(Status.ENVENENADO);
+        }
+        if (resolution.damage > 0 && defender.hasAbilityText("si es dañado por un ataque el atacante recibe 1 de daño")) {
+            attacker.health -= 1;
+        }
+        if (resolution.damage <= 0 && defender.hasAbilityText("si recibe 0 de daño tras un ataque el atacante queda aturdido")) {
+            attacker.applyStatus(Status.PARALIZADO);
+        }
+    }
+
+    private void maybeApplyFailedAttackTriggers(SpeciesRef attackerRef, SpeciesRef defenderRef) {
+        SpeciesState attacker = attackerRef.species;
+        SpeciesState defender = defenderRef.species;
+        if (defender.hasAbilityText("si un rival te ataca") && defender.hasAbilityText("falla")
+                && defender.hasAbilityText("confundido")) {
+            attacker.applyStatus(Status.CONFUNDIDO);
         }
     }
 
@@ -696,11 +721,32 @@ public class PlayActivity extends AppCompatActivity {
                 }
 
                 int metabolism = species.getMetabolism(activeBiome);
+                if (species.hasAbilityText("puede ignorar 1 consumo de alimento por ronda")
+                        && !species.ignoredFoodConsumptionThisRound
+                        && metabolism > 0) {
+                    metabolism -= 1;
+                    species.ignoredFoodConsumptionThisRound = true;
+                }
                 species.food -= metabolism;
                 appendLog(speciesName + " consume " + metabolism + " comida por metabolismo.");
 
                 boolean starvation = species.food < 1;
                 boolean lowHealth = species.health < 1;
+                if (lowHealth && species.hasCard("A66")) {
+                    GameCard reviveCard = null;
+                    for (GameCard card : species.cards) {
+                        if ("A66".equalsIgnoreCase(card.id)) {
+                            reviveCard = card;
+                            break;
+                        }
+                    }
+                    if (reviveCard != null) {
+                        species.cards.remove(reviveCard);
+                        species.health = species.getAdaptationHealth();
+                        lowHealth = false;
+                        appendLog(speciesName + " activa su habilidad de supervivencia: descarta una adaptación para evitar perder individuo.");
+                    }
+                }
                 if (lowHealth || starvation) {
                     species.individuals -= 1;
                     species.food = Math.max(0, species.food);
@@ -775,6 +821,9 @@ public class PlayActivity extends AppCompatActivity {
                 species.tookPredationDamageThisRound = false;
                 species.forageSuccessThisRound = false;
                 species.failedAttackFoodBonusAppliedThisRound = false;
+                species.wasFirstAttackDefenseUsedThisRound = false;
+                species.ignoredFoodConsumptionThisRound = false;
+                species.paidStatusProtectionThisRound = false;
                 species.lastAttacker = null;
             }
         }
@@ -895,11 +944,49 @@ public class PlayActivity extends AppCompatActivity {
             success = attacker.getSpeed() > defender.getSpeed();
         }
 
-        int damage = success ? Math.max(0, attacker.getAttack() - (defender.getArmor() / 2)) : 0;
-        return new AttackResolution(modeLabel, success, damage);
+        int attackPower = attacker.getAttack();
+        if (attacker.hasCard("A15") || attacker.hasAbilityText("al atacar obtiene +1 de ataque")) {
+            attackPower += 1;
+        }
+        int effectiveArmor = defender.getArmor();
+        if (attacker.hasCard("A2") || attacker.hasAbilityText("ignora la armadura de la presa")) {
+            effectiveArmor = 0;
+        }
+        if (defender.hasAbilityText("la primera vez que esta especie sea atacada cada ronda")
+                && !defender.wasFirstAttackDefenseUsedThisRound) {
+            defender.wasFirstAttackDefenseUsedThisRound = true;
+            attackPower = Math.max(0, attackPower - 1);
+        }
+        if ("emboscada".equals(modeLabel)
+                && defender.hasAbilityText("si es atacado por emboscada recibe un bono de +2 de velocidad")) {
+            success = (attacker.getSpeed() > defender.getSpeed() + 2);
+        }
+
+        int damage = success ? Math.max(0, attackPower - (effectiveArmor / 2)) : 0;
+        return new AttackResolution(modeLabel, success, damage, attackPower);
     }
 
     private void maybeApplyAttackStatus(SpeciesState attacker, SpeciesState defender) {
+        if (attacker.hasAbilityText("si golpea a la presa está queda paralizada")
+                || attacker.hasAbilityText("si ataca con éxito el defensor queda paralizado")) {
+            defender.applyStatus(Status.PARALIZADO);
+            return;
+        }
+        if (attacker.hasAbilityText("el objetivo queda envenenado")) {
+            defender.applyStatus(Status.ENVENENADO);
+            return;
+        }
+        if (attacker.hasAbilityText("aplica un estado aleatorio a la especie objetivo")) {
+            Status[] rollable = new Status[]{
+                    Status.ENVENENADO,
+                    Status.PARALIZADO,
+                    Status.CONFUNDIDO,
+                    Status.ENFERMEDAD,
+                    Status.TERROR
+            };
+            defender.applyStatus(rollable[random.nextInt(rollable.length)]);
+            return;
+        }
         String jawId = attacker.getPrimaryJawId();
         if (jawId == null) {
             return;
@@ -937,6 +1024,14 @@ public class PlayActivity extends AppCompatActivity {
             if ("A106".equals(primaryJawId) && !species.forageSuccessThisRound) {
                 species.food += 1;
                 String message = getSpeciesLabel(ref) + " activa Mandíbula de Broteo y obtiene +1 comida al no forrajear.";
+                appendLog(message);
+                showMessage(message);
+            }
+            if (species.forageSuccessThisRound
+                    && species.isInAnyBiome("pradera", "estepa")
+                    && species.hasAbilityText("si forrajeas en pradera/estepa")) {
+                species.food += 1;
+                String message = getSpeciesLabel(ref) + " obtiene +1 comida adicional por habilidad de forrajeo en Pradera/Estepa.";
                 appendLog(message);
                 showMessage(message);
             }
@@ -1523,6 +1618,9 @@ public class PlayActivity extends AppCompatActivity {
         boolean tookPredationDamageThisRound;
         boolean forageSuccessThisRound;
         boolean failedAttackFoodBonusAppliedThisRound;
+        boolean wasFirstAttackDefenseUsedThisRound;
+        boolean ignoredFoodConsumptionThisRound;
+        boolean paidStatusProtectionThisRound;
         int lastStatusAppliedRound = -1;
         PlayerState lastAttacker;
 
@@ -1600,6 +1698,7 @@ public class PlayActivity extends AppCompatActivity {
 
         int getSpeed() {
             int speed = getBaseStat("speed") + getBiomeModifier("Velocidad");
+            speed += getAbilityBasedStatModifier("speed");
             if (hasStatus(Status.PARALIZADO)) {
                 return 0;
             }
@@ -1615,6 +1714,7 @@ public class PlayActivity extends AppCompatActivity {
 
         int getPerception() {
             int perception = getBaseStat("perception") + getBiomeModifier("Percepción");
+            perception += getAbilityBasedStatModifier("perception");
             if (hasStatus(Status.CONFUNDIDO)) {
                 perception -= 3;
             }
@@ -1630,6 +1730,7 @@ public class PlayActivity extends AppCompatActivity {
 
         int getMetabolism(GameCard biome) {
             int metabolism = Math.max(1, individuals + getBaseStat("metabolism") + getBiomeModifier("Metabolismo"));
+            metabolism += getAbilityBasedStatModifier("metabolism");
             int currentTemperature = getTemperature(biome);
             if (currentTemperature >= 5 || currentTemperature <= -5) {
                 metabolism += 2;
@@ -1640,6 +1741,80 @@ public class PlayActivity extends AppCompatActivity {
                 metabolism += 1;
             }
             return metabolism;
+        }
+
+        int getAbilityBasedStatModifier(String stat) {
+            int total = 0;
+            if ("speed".equals(stat)) {
+                if (isInAnyBiome("manglar", "manglares", "playa", "arrecife")
+                        && (hasAbilityText("manglares y arrecife +1 de velocidad")
+                        || hasAbilityText("obtiene +1 de velocidad en manglares, playa y arrecife"))) {
+                    total += 1;
+                }
+                if (isInAnyBiome("playa", "arrecife") && hasAbilityText("obtiene +1 de velocidad en playa y arrecife")) {
+                    total += 1;
+                }
+                if (isInAnyBiome("jungla", "bosque") && (hasAbilityText("obtiene +2 de velocidad en jungla y bosque")
+                        || hasAbilityText("+2 de velocidad en jungla y bosque"))) {
+                    total += 2;
+                }
+                if (isInAnyBiome("jungla", "montaña") && hasAbilityText("+2 de velocidad en jungla y montaña")) {
+                    total += 2;
+                }
+                if (isInAnyBiome("taiga", "estepa", "tundra", "montaña fría", "glaciares")
+                        && hasAbilityText("+2 de velocidad en taiga, estepa, tundras, montaña fría y glaciares")) {
+                    total += 2;
+                }
+                if (isInAnyBiome("desierto", "montaña", "sabana")
+                        && hasAbilityText("esta especie tiene +1 de velocidad en desierto, montaña y sabana")) {
+                    total += 1;
+                }
+                if (isInAnyBiome("taiga", "estepa", "tundra")
+                        && hasAbilityText("esta especie tiene +1 de velocidad en taiga, estepa y tundra")) {
+                    total += 1;
+                }
+            }
+            if ("metabolism".equals(stat)
+                    && isInAnyBiome("desierto", "montaña", "sabana")
+                    && hasAbilityText("esta especie tiene -1 de metabolismo en desierto, montaña y sabana")) {
+                total -= 1;
+            }
+            if ("perception".equals(stat)
+                    && isInAnyBiome("manglar", "arrecife", "playa", "glaciares")
+                    && hasAbilityText("obtiene mas 2 de persepcion en manglar, arecife, playa y glaciares")) {
+                total += 2;
+            }
+            return total;
+        }
+
+        boolean hasAbilityText(String fragment) {
+            if (fragment == null || fragment.trim().isEmpty()) {
+                return false;
+            }
+            String needle = normalizeSimple(fragment);
+            for (GameCard card : cards) {
+                CardDesignDetails.DesignCardInfo info = CardDesignDetails.findByGameCard(card);
+                if (info == null || info.ability == null) {
+                    continue;
+                }
+                if (normalizeSimple(info.ability).contains(needle)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        boolean isInAnyBiome(String... biomeNames) {
+            if (activeBiome == null || activeBiome.name == null || biomeNames == null) {
+                return false;
+            }
+            String active = normalizeSimple(activeBiome.name);
+            for (String biomeName : biomeNames) {
+                if (active.contains(normalizeSimple(biomeName))) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         int getFertility() {
@@ -1775,6 +1950,16 @@ public class PlayActivity extends AppCompatActivity {
 
         void applyStatus(Status status) {
             if (status == null || statuses.contains(status)) {
+                return;
+            }
+            if (hasAbilityText("inmunidad a todos los estados")) {
+                return;
+            }
+            if (hasAbilityText("puede pagar 1 comida para ignorar un estado negativo")
+                    && !paidStatusProtectionThisRound
+                    && food > 0) {
+                food -= 1;
+                paidStatusProtectionThisRound = true;
                 return;
             }
             if (lastStatusAppliedRound == round) {
@@ -1928,6 +2113,39 @@ public class PlayActivity extends AppCompatActivity {
             return;
         }
         String cardId = card.id.toUpperCase(Locale.US);
+        CardDesignDetails.DesignCardInfo info = CardDesignDetails.findByGameCard(card);
+        String ability = info == null || info.ability == null ? "" : normalizeSimple(info.ability);
+
+        if (ability.contains("roba 1 carta") || ability.contains("roba una carta")) {
+            owner.drawTo(Math.min(HAND_TARGET + 1, owner.hand.size() + 1));
+        }
+        if (ability.contains("roba 1 carta y luego descarta 1 carta") || ability.contains("roba 1 carta y luego descarta 1")) {
+            if (!owner.hand.isEmpty()) {
+                owner.hand.remove(random.nextInt(owner.hand.size()));
+            }
+        }
+        if (ability.contains("coloca 2 de comida") || ability.contains("mueve 2 planta")) {
+            targetSpecies.food += 2;
+        }
+        if (ability.contains("queda confundida") || ability.contains("queda confundido")) {
+            SpeciesRef rival = chooseRandomEnemySpecies(owner);
+            if (rival != null) {
+                rival.species.applyStatus(Status.CONFUNDIDO);
+            }
+        }
+        if (ability.contains("queda en terror")) {
+            SpeciesRef rival = chooseRandomEnemySpecies(owner);
+            if (rival != null) {
+                rival.species.applyStatus(Status.TERROR);
+            }
+        }
+        if (ability.contains("cura 1 punto de salud") && targetSpecies.health < targetSpecies.getAdaptationHealth()) {
+            targetSpecies.health += 1;
+        }
+        if (ability.contains("cura 2 punto de salud") && targetSpecies.health < targetSpecies.getAdaptationHealth()) {
+            targetSpecies.health += 2;
+        }
+
         if ("A4".equals(cardId)) {
             owner.drawTo(Math.min(HAND_TARGET + 1, owner.hand.size() + 1));
             if (!owner.hand.isEmpty()) {
@@ -1942,6 +2160,24 @@ public class PlayActivity extends AppCompatActivity {
             owner.drawTo(Math.min(HAND_TARGET + 1, owner.hand.size() + 1));
             appendLog(owner.name + " activa Microhábitat Favorable: roba 1 carta por bioma activo.");
         }
+
+        targetSpecies.health = Math.min(targetSpecies.health, targetSpecies.getAdaptationHealth());
+    }
+
+    private SpeciesRef chooseRandomEnemySpecies(PlayerState owner) {
+        List<SpeciesRef> enemies = new ArrayList<>();
+        for (PlayerState player : players) {
+            if (player == owner) {
+                continue;
+            }
+            for (SpeciesState species : player.species) {
+                enemies.add(new SpeciesRef(player, species));
+            }
+        }
+        if (enemies.isEmpty()) {
+            return null;
+        }
+        return enemies.get(random.nextInt(enemies.size()));
     }
 
     private static class JawTargetRules {
@@ -1981,11 +2217,13 @@ public class PlayActivity extends AppCompatActivity {
         final String modeLabel;
         final boolean success;
         final int damage;
+        final int attackPower;
 
-        AttackResolution(String modeLabel, boolean success, int damage) {
+        AttackResolution(String modeLabel, boolean success, int damage, int attackPower) {
             this.modeLabel = modeLabel;
             this.success = success;
             this.damage = damage;
+            this.attackPower = attackPower;
         }
     }
 
