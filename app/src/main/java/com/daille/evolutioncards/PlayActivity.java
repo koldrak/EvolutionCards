@@ -888,15 +888,19 @@ public class PlayActivity extends AppCompatActivity {
     private String buildScoreboardOverlayMessage() {
         StringBuilder builder = new StringBuilder();
         builder.append("📊 Puntajes al final de la ronda ").append(round).append("\n\n");
-        for (int i = 0; i < players.size(); i++) {
-            PlayerState player = players.get(i);
+
+        List<PlayerState> ranking = new ArrayList<>(players);
+        ranking.sort((a, b) -> Integer.compare(b.score, a.score));
+
+        for (int i = 0; i < ranking.size(); i++) {
+            PlayerState player = ranking.get(i);
             builder.append(i + 1)
                     .append(") ")
                     .append(player.name)
                     .append(": ")
                     .append(player.score)
                     .append(" pts");
-            if (i < players.size() - 1) {
+            if (i < ranking.size() - 1) {
                 builder.append("\n");
             }
         }
@@ -927,7 +931,7 @@ public class PlayActivity extends AppCompatActivity {
                 winner = player;
             }
         }
-        boolean scoreLimitReached = winner != null && winner.score >= 150;
+        boolean scoreLimitReached = winner != null && winner.score > 150;
         boolean deckExhausted = false;
         for (PlayerState player : players) {
             if (player.deck.isEmpty()) {
@@ -941,10 +945,11 @@ public class PlayActivity extends AppCompatActivity {
 
         gameOver = true;
         String reason = scoreLimitReached
-                ? "Fin de partida: " + winner.name + " alcanzó 150 puntos."
+                ? "Fin de partida: " + winner.name + " superó los 150 puntos."
                 : "Fin de partida: se agotó al menos un mazo.";
+        String finalScoreboard = "🏁 Resultado final\n\n" + buildScoreboardOverlayMessage();
         appendLog(reason);
-        showMessage(reason);
+        showMessage(reason + "\n\n" + finalScoreboard);
     }
 
     private void maybeAdvanceBiome() {
