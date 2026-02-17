@@ -601,8 +601,12 @@ public class PlayActivity extends AppCompatActivity {
 
     private void resolveForagePhase() {
         int foragePool = random.nextInt(10) + 1;
+        int climbingBonus = getForageGrowthBonusFromAbilities();
+        foragePool += climbingBonus;
         renderForageTokens(foragePool);
-        String diceMessage = "Resultado del dado: " + foragePool + ". Se agregan fichas de alimento a la zona de forraje.";
+        String diceMessage = "Resultado del dado: " + (foragePool - climbingBonus)
+                + ". Se agregan fichas de alimento a la zona de forraje."
+                + (climbingBonus > 0 ? " Bono por Patas Trepadoras: +" + climbingBonus + "." : "");
         appendLog(diceMessage);
         showMessage(diceMessage);
 
@@ -699,6 +703,9 @@ public class PlayActivity extends AppCompatActivity {
         if (resolution.damage <= 0 && defender.hasAbilityText("si recibe 0 de daño tras un ataque el atacante queda aturdido")) {
             attacker.applyStatus(Status.PARALIZADO);
         }
+        if (defender.hasCard("A95") || defender.hasAbilityText("tras realizar una defensa su atacante queda confundido")) {
+            attacker.applyStatus(Status.CONFUNDIDO);
+        }
     }
 
     private void maybeApplyFailedAttackTriggers(SpeciesRef attackerRef, SpeciesRef defenderRef) {
@@ -706,6 +713,9 @@ public class PlayActivity extends AppCompatActivity {
         SpeciesState defender = defenderRef.species;
         if (defender.hasAbilityText("si un rival te ataca") && defender.hasAbilityText("falla")
                 && defender.hasAbilityText("confundido")) {
+            attacker.applyStatus(Status.CONFUNDIDO);
+        }
+        if (defender.hasCard("A95") || defender.hasAbilityText("tras realizar una defensa su atacante queda confundido")) {
             attacker.applyStatus(Status.CONFUNDIDO);
         }
     }
@@ -749,6 +759,15 @@ public class PlayActivity extends AppCompatActivity {
                     }
                 }
                 if (lowHealth || starvation) {
+                    if (species.consumeReserveTailIfPossible()) {
+                        species.food = Math.max(0, species.food);
+                        species.health = species.getAdaptationHealth();
+                        String reserveMessage = speciesName
+                                + " activa Cola Reserva: descarta la carta para evitar perder individuo y recupera la salud.";
+                        appendLog(reserveMessage);
+                        showMessage(reserveMessage);
+                        continue;
+                    }
                     species.individuals -= 1;
                     grantScavengerFoodBonus();
                     species.food = Math.max(0, species.food);
@@ -797,6 +816,16 @@ public class PlayActivity extends AppCompatActivity {
                 showMessage(message);
             }
         }
+    }
+
+    private int getForageGrowthBonusFromAbilities() {
+        int bonus = 0;
+        for (SpeciesRef ref : collectSpecies()) {
+            if (ref.species.hasCard("A50")) {
+                bonus += 1;
+            }
+        }
+        return bonus;
     }
 
     private void resolveReproductionPhase() {
@@ -965,6 +994,12 @@ public class PlayActivity extends AppCompatActivity {
         SpeciesState defender = defenderRef.species;
         String modeLabel;
         boolean success;
+        int attackerSpeed = attacker.getSpeed();
+        int defenderSpeed = defender.getSpeed();
+
+        if (attacker.hasCard("A53") && attacker.isInAnyBiome("playa", "manglar")) {
+            attackerSpeed += 2;
+        }
 
         if (attacker.getPerception() > defender.getPerception()) {
             if (random.nextBoolean()) {
@@ -972,11 +1007,25 @@ public class PlayActivity extends AppCompatActivity {
                 success = true;
             } else {
                 modeLabel = "huida con ventaja";
-                success = attacker.getSpeed() > defender.getSpeed() + 2;
+                success = attackerSpeed > defenderSpeed + 2;
             }
         } else {
             modeLabel = "huida";
-            success = attacker.getSpeed() > defender.getSpeed();
+            success = attackerSpeed > defenderSpeed;
+        }
+
+        if (defender.hasCard("A54") && !"emboscada".equals(modeLabel)) {
+            success = false;
+        }
+
+        if ("emboscada".equals(modeLabel) && attacker.hasCard("A65")) {
+            success = true;
+            boolean removed = attacker.consumeCardById("A65");
+            if (removed) {
+                attacker.health = Math.min(attacker.health, attacker.getAdaptationHealth());
+                appendLog(getSpeciesLabel(attackerRef)
+                        + " activa Cola Señuelo: su emboscada es exitosa y descarta la adaptación.");
+            }
         }
 
         int attackPower = attacker.getAttack();
@@ -994,7 +1043,7 @@ public class PlayActivity extends AppCompatActivity {
         }
         if ("emboscada".equals(modeLabel)
                 && defender.hasAbilityText("si es atacado por emboscada recibe un bono de +2 de velocidad")) {
-            success = (attacker.getSpeed() > defender.getSpeed() + 2);
+            success = (attackerSpeed > defenderSpeed + 2);
         }
 
         int damage = success ? Math.max(0, attackPower - (effectiveArmor / 2)) : 0;
@@ -1700,6 +1749,7 @@ public class PlayActivity extends AppCompatActivity {
         boolean ignoredFoodConsumptionThisRound;
         boolean paidStatusProtectionThisRound;
         int lastStatusAppliedRound = -1;
+        int permanentFertilityBonus = 0;
         PlayerState lastAttacker;
 
         DietType getDietType() {
@@ -1771,6 +1821,28 @@ public class PlayActivity extends AppCompatActivity {
                 }
             }
             return false;
+        }
+
+        boolean consumeCardById(String cardId) {
+            if (cardId == null) {
+                return false;
+            }
+            for (int i = 0; i < cards.size(); i++) {
+                GameCard card = cards.get(i);
+                if (cardId.equalsIgnoreCase(card.id)) {
+                    cards.remove(i);
+                    unregisterTemperatureChoice(card);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        boolean consumeReserveTailIfPossible() {
+            if (!hasCard("A62")) {
+                return false;
+            }
+            return consumeCardById("A62");
         }
 
         int getAttack() {
@@ -1988,7 +2060,7 @@ public class PlayActivity extends AppCompatActivity {
 
         int getFertility() {
             return Math.max(1, individuals + getBaseStat("fertility") + getBiomeModifier("Fertilidad")
-                    + getAbilityBasedStatModifier("fertility"));
+                    + getAbilityBasedStatModifier("fertility") + permanentFertilityBonus);
         }
 
         int getNonJawCardCount() {
@@ -2337,6 +2409,68 @@ public class PlayActivity extends AppCompatActivity {
                 owner.hand.remove(random.nextInt(owner.hand.size()));
             }
             appendLog(owner.name + " activa Mandíbula Canina: roba 1 carta y descarta 1 aleatoria.");
+        } else if ("A37".equals(cardId)) {
+            SpeciesRef chosen = chooseRandomSpeciesRef();
+            if (chosen != null) {
+                chosen.species.permanentFertilityBonus += 1;
+                appendLog(owner.name + " activa Patas Largas: " + getSpeciesLabel(chosen)
+                        + " gana +1 fertilidad permanente.");
+            }
+        } else if ("A40".equals(cardId)) {
+            GameCard handAdaptation = chooseRandomAdaptationFromHand(owner, card);
+            SpeciesRef chosenSpecies = chooseRandomSpeciesRefWithReplaceableAdaptation();
+            if (handAdaptation != null && chosenSpecies != null) {
+                chosenSpecies.species.replaceRandomNonJaw(handAdaptation, random);
+                owner.hand.remove(handAdaptation);
+                appendLog(owner.name + " activa Tentáculos: intercambia una adaptación de mano por una adaptación en "
+                        + getSpeciesLabel(chosenSpecies) + ".");
+            }
+        } else if ("A43".equals(cardId)) {
+            PlayerState rivalDeck = chooseRandomEnemyPlayerWithDeck(owner);
+            if (rivalDeck != null) {
+                GameCard stolen = rivalDeck.deck.remove(0);
+                owner.hand.add(stolen);
+                appendLog(owner.name + " activa Garras para Cavado y roba del mazo de " + rivalDeck.name
+                        + " la carta " + stolen.id + " · " + stolen.name + ".");
+            }
+        } else if ("A46".equals(cardId)) {
+            PlayerState rival = chooseRandomEnemyPlayerWithCards(owner);
+            if (rival != null) {
+                int discarded = 0;
+                while (discarded < 2 && !rival.hand.isEmpty()) {
+                    rival.hand.remove(random.nextInt(rival.hand.size()));
+                    discarded++;
+                }
+                appendLog(owner.name + " activa Alas Cortas: revisa la mano rival y " + rival.name
+                        + " descarta " + discarded + " cartas.");
+            }
+        } else if ("A52".equals(cardId)) {
+            if (!owner.deck.isEmpty()) {
+                int pick = random.nextInt(owner.deck.size());
+                GameCard tutored = owner.deck.remove(pick);
+                owner.hand.add(tutored);
+                appendLog(owner.name + " activa Cola Látigo: busca en su mazo y añade a la mano "
+                        + tutored.id + " · " + tutored.name + ".");
+            }
+        } else if ("A71".equals(cardId)) {
+            int top = Math.min(5, owner.deck.size());
+            if (top > 0) {
+                int pick = random.nextInt(top);
+                GameCard selected = owner.deck.remove(pick);
+                owner.hand.add(selected);
+                appendLog(owner.name + " activa Olfato Agudo: mira el top " + top
+                        + " y añade a su mano " + selected.id + " · " + selected.name + ".");
+            }
+        } else if ("A73".equals(cardId)) {
+            PlayerState rival = chooseRandomEnemyPlayerWithCards(owner);
+            GameCard ownCard = chooseRandomCardFromHand(owner, card);
+            if (rival != null && ownCard != null && !rival.hand.isEmpty()) {
+                GameCard rivalCard = rival.hand.remove(random.nextInt(rival.hand.size()));
+                owner.hand.remove(ownCard);
+                owner.hand.add(rivalCard);
+                rival.hand.add(ownCard);
+                appendLog(owner.name + " activa Audición Direccional: intercambia 1 carta con " + rival.name + ".");
+            }
         } else if ("A112".equals(cardId)) {
             targetSpecies.food += 2;
             appendLog(owner.name + " activa Pico Granívoro: la especie obtiene +2 comida al jugarla.");
@@ -2347,6 +2481,70 @@ public class PlayActivity extends AppCompatActivity {
         }
 
         targetSpecies.health = Math.min(targetSpecies.health, targetSpecies.getAdaptationHealth());
+    }
+
+    private SpeciesRef chooseRandomSpeciesRef() {
+        List<SpeciesRef> all = collectSpecies();
+        if (all.isEmpty()) {
+            return null;
+        }
+        return all.get(random.nextInt(all.size()));
+    }
+
+    private SpeciesRef chooseRandomSpeciesRefWithReplaceableAdaptation() {
+        List<SpeciesRef> candidates = new ArrayList<>();
+        for (SpeciesRef ref : collectSpecies()) {
+            if (ref.species.getNonJawCardCount() > 0) {
+                candidates.add(ref);
+            }
+        }
+        if (candidates.isEmpty()) {
+            return null;
+        }
+        return candidates.get(random.nextInt(candidates.size()));
+    }
+
+    private PlayerState chooseRandomEnemyPlayerWithDeck(PlayerState owner) {
+        List<PlayerState> candidates = new ArrayList<>();
+        for (PlayerState player : players) {
+            if (player == owner || player.deck.isEmpty()) {
+                continue;
+            }
+            candidates.add(player);
+        }
+        if (candidates.isEmpty()) {
+            return null;
+        }
+        return candidates.get(random.nextInt(candidates.size()));
+    }
+
+    private GameCard chooseRandomAdaptationFromHand(PlayerState owner, GameCard excluded) {
+        List<GameCard> candidates = new ArrayList<>();
+        for (GameCard handCard : owner.hand) {
+            if (handCard == excluded) {
+                continue;
+            }
+            if (!isJaw(handCard)) {
+                candidates.add(handCard);
+            }
+        }
+        if (candidates.isEmpty()) {
+            return null;
+        }
+        return candidates.get(random.nextInt(candidates.size()));
+    }
+
+    private GameCard chooseRandomCardFromHand(PlayerState owner, GameCard excluded) {
+        List<GameCard> candidates = new ArrayList<>();
+        for (GameCard handCard : owner.hand) {
+            if (handCard != excluded) {
+                candidates.add(handCard);
+            }
+        }
+        if (candidates.isEmpty()) {
+            return null;
+        }
+        return candidates.get(random.nextInt(candidates.size()));
     }
 
     private PlayerState chooseRandomEnemyPlayerWithCards(PlayerState owner) {
