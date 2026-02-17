@@ -135,13 +135,13 @@ public final class CardRepository {
         cards.add(new GameCard("B1", "Desierto", "Bioma", "Ataque: -1 | Percepción: 1 | Temperatura: 4", ""));
         cards.add(new GameCard("B2", "Montaña", "Bioma", "Armadura: 1 | Velocidad: -2 | Temperatura: 3", ""));
         cards.add(new GameCard("B3", "Sabana", "Bioma", "Ataque: 1 | Armadura: -1 | Velocidad: 2 | Percepción: 1 | Temperatura: 2", ""));
-        cards.add(new GameCard("B4", "Manglar", "Bioma", "Armadura: -1 | Salud: 1 | Velocidad: -2 | Percepción: 1 | Fertilidad: -1 | Temperatura: 2", ""));
+        cards.add(new GameCard("B4", "Manglar", "Bioma", "Armadura: -1 | Salud: 1 | Velocidad: -2 | Percepción: 1 | Fertilidad: 1 | Temperatura: 2", ""));
         cards.add(new GameCard("B5", "Jungla", "Bioma", "Ataque: 1 | Percepción: 1 | Temperatura: 2", ""));
         cards.add(new GameCard("B6", "Arrecife", "Bioma", "Ataque: -1 | Armadura: 1 | Salud: 1 | Velocidad: -1 | Percepción: 1", ""));
         cards.add(new GameCard("B7", "Playa", "Bioma", "Armadura: -1 | Velocidad: 1 | Percepción: -1", ""));
         cards.add(new GameCard("B8", "Bosque", "Bioma", "Ataque: 1 | Percepción: 1", ""));
         cards.add(new GameCard("B9", "Llanura", "Bioma", "Armadura: -1 | Velocidad: 2 | Percepción: -1", ""));
-        cards.add(new GameCard("B10", "Pradera", "Bioma", "Ataque: 1 | Velocidad: 2 | Percepción: -1 | Fertilidad: 1", ""));
+        cards.add(new GameCard("B10", "Pradera", "Bioma", "Ataque: 1 | Velocidad: 2 | Percepción: -1 | Fertilidad: -1", ""));
         cards.add(new GameCard("B11", "Taiga", "Bioma", "Velocidad: -1 | Temperatura: -2", ""));
         cards.add(new GameCard("B12", "Estepa", "Bioma", "Ataque: -1 | Velocidad: 1 | Temperatura: -2", ""));
         cards.add(new GameCard("B13", "Tundra", "Bioma", "Ataque: -1 | Salud: -1 | Percepción: -1 | Temperatura: -2", ""));
