@@ -678,6 +678,9 @@ public class PlayActivity extends AppCompatActivity {
             for (String detailLine : resolution.detailLines) {
                 appendLog(detailLine);
             }
+            String attackDetailsForPlayer = resolution.detailLines.isEmpty()
+                    ? ""
+                    : "\n" + TextUtils.join("\n", resolution.detailLines);
             if (resolution.success) {
                 target.species.health -= resolution.damage;
                 if (resolution.damage > 0) {
@@ -694,7 +697,7 @@ public class PlayActivity extends AppCompatActivity {
                         + " pierde " + resolution.damage + " de salud y "
                         + getSpeciesLabel(attackerRef) + " recibe " + resolution.attackPower + " fichas de comida.";
                 appendLog(attackMessage);
-                showMessage(attackMessage);
+                showMessage(attackMessage + attackDetailsForPlayer);
             } else {
                 String failMessage = getSpeciesLabel(attackerRef)
                         + " ataca por " + resolution.modeLabel + " a " + getSpeciesLabel(target)
@@ -702,7 +705,7 @@ public class PlayActivity extends AppCompatActivity {
                 maybeApplyFailedAttackDefenderBonus(target.species, target);
                 maybeApplyFailedAttackTriggers(attackerRef, target);
                 appendLog(failMessage);
-                showMessage(failMessage);
+                showMessage(failMessage + attackDetailsForPlayer);
             }
         }
     }
