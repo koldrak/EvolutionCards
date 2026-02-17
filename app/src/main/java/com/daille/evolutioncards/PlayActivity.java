@@ -692,13 +692,7 @@ public class PlayActivity extends AppCompatActivity {
                 attackerRef.player.score += resolution.attackPower;
                 maybeApplyAttackStatus(attacker, target.species);
                 maybeApplyDefenseTriggersOnSuccessfulAttack(attackerRef, target, resolution);
-                String attackMessage = getSpeciesLabel(attackerRef)
-                        + " ataca por " + resolution.modeLabel + " a " + getSpeciesLabel(target)
-                        + ". Resultado ataque exitoso " + getSpeciesLabel(target)
-                        + " pierde " + resolution.damage + " de salud y "
-                        + getSpeciesLabel(attackerRef) + " recibe " + resolution.attackPower + " fichas de comida.";
-                appendLog(attackMessage);
-                showMessage(attackMessage + attackDetailsForPlayer);
+
             } else {
                 String failMessage = getSpeciesLabel(attackerRef)
                         + " ataca por " + resolution.modeLabel + " a " + getSpeciesLabel(target)
@@ -1095,8 +1089,8 @@ public class PlayActivity extends AppCompatActivity {
             modeLabel = "huida";
             success = attackerSpeed > defenderSpeed;
             detailLines.add("- Se comparan sus atributos de percepción (atacante "
-                    + attackerPerception + " vs defensor " + defenderPerception + ") y no gana el atacante.");
-            detailLines.add("- No hay lanzamiento de moneda; se resuelve ataque por huida.");
+                    + attackerPerception + " vs defensor " + defenderPerception + ") y gana defensor.");
+            detailLines.add("- Se resuelve ataque por huida.");
         }
 
         if (!"emboscada".equals(modeLabel)) {
@@ -1150,8 +1144,8 @@ public class PlayActivity extends AppCompatActivity {
         }
 
         int damage = success ? Math.max(0, attackPower - (effectiveArmor / 2)) : 0;
-        detailLines.add("- Cálculo final: daño = max(0, ataque " + attackPower + " - armadura efectiva/2 "
-                + (effectiveArmor / 2) + ") => " + damage + ".");
+        detailLines.add("- Cálculo final: daño = max(ataque " + attackPower + " -"
+                + (effectiveArmor / 2) + ") = " + damage + ".");
         return new AttackResolution(modeLabel, success, damage, attackPower, detailLines);
     }
 
