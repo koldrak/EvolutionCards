@@ -2822,7 +2822,7 @@ public class PlayActivity extends AppCompatActivity {
             return Integer.MIN_VALUE;
         }
         CardDesignDetails.DesignCardInfo info = CardDesignDetails.findByGameCard(card);
-        int value = parseRarityValue(card.rarity) * 10;
+        int value = parseRarityValue(card.metadata) * 10;
         if (info != null) {
             value += Math.max(0, parseStatValue(info.attack));
             value += Math.max(0, parseStatValue(info.armor));
