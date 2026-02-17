@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
+import java.text.Normalizer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -1227,7 +1228,7 @@ public class PlayActivity extends AppCompatActivity {
         if (!"mandíbula".equalsIgnoreCase(card.type)) {
             return "";
         }
-        if (!"carnivoro".equalsIgnoreCase(normalizeSimple(designInfo.feedingType))) {
+        if (!isPredatorFeedingType(designInfo.feedingType)) {
             return "";
         }
         if (isBlankOrDash(designInfo.attackTarget)) {
@@ -1277,6 +1278,12 @@ public class PlayActivity extends AppCompatActivity {
             // Si no es número, se muestra tal cual.
         }
         parts.add(label + " " + rawValue);
+    }
+
+
+    private boolean isPredatorFeedingType(String feedingType) {
+        String normalized = normalizeSimple(feedingType);
+        return "carnivoro".equals(normalized) || "omnivoro".equals(normalized);
     }
 
     private String normalizeSimple(String text) {
@@ -1562,21 +1569,24 @@ public class PlayActivity extends AppCompatActivity {
         }
 
         TargetRule getTargetRule() {
-            String jawId = getPrimaryJawId();
-            if (jawId == null) {
+            GameCard primaryJaw = getPrimaryJawCard();
+            if (primaryJaw == null) {
                 return TargetRule.RANDOM;
             }
-            Map<String, TargetRule> rules = JawTargetRules.RULES;
-            if (rules.containsKey(jawId)) {
-                return rules.get(jawId);
-            }
-            return TargetRule.RANDOM;
+            return JawTargetRules.resolveForJaw(primaryJaw);
         }
 
         private String getPrimaryJawId() {
+            GameCard primaryJaw = getPrimaryJawCard();
+            return primaryJaw == null || primaryJaw.id == null
+                    ? null
+                    : primaryJaw.id.toUpperCase(Locale.US);
+        }
+
+        private GameCard getPrimaryJawCard() {
             for (GameCard card : cards) {
                 if ("Mandíbula".equalsIgnoreCase(card.type)) {
-                    return card.id == null ? null : card.id.toUpperCase(Locale.US);
+                    return card;
                 }
             }
             return null;
@@ -1945,23 +1955,51 @@ public class PlayActivity extends AppCompatActivity {
     }
 
     private static class JawTargetRules {
-        static final Map<String, TargetRule> RULES = new java.util.HashMap<>();
+        static TargetRule resolveForJaw(GameCard jawCard) {
+            if (jawCard == null) {
+                return TargetRule.RANDOM;
+            }
 
-        static {
-            RULES.put("A1", TargetRule.LOWEST_SPEED);
-            RULES.put("A2", TargetRule.HIGHEST_ARMOR);
-            RULES.put("A3", TargetRule.LOWEST_SPEED);
-            RULES.put("A4", TargetRule.LOWEST_SPEED);
-            RULES.put("A5", TargetRule.LOWEST_PERCEPTION);
-            RULES.put("A6", TargetRule.LOWEST_PERCEPTION);
-            RULES.put("A7", TargetRule.LOWEST_PERCEPTION);
-            RULES.put("A8", TargetRule.LOWEST_SPEED);
-            RULES.put("A9", TargetRule.LOWEST_PERCEPTION);
-            RULES.put("A10", TargetRule.LOWEST_SPEED);
-            RULES.put("A12", TargetRule.LOWEST_PERCEPTION);
-            RULES.put("A13", TargetRule.LOWEST_PERCEPTION);
-            RULES.put("A14", TargetRule.LOWEST_DEFENSE);
-            RULES.put("A15", TargetRule.LOWEST_DEFENSE);
+            CardDesignDetails.DesignCardInfo designInfo = CardDesignDetails.findByGameCard(jawCard);
+            if (designInfo == null || !isPredatorFeedingType(designInfo.feedingType)) {
+                return TargetRule.RANDOM;
+            }
+
+            return fromAttackTargetText(designInfo.attackTarget);
+        }
+
+        private static boolean isPredatorFeedingType(String feedingType) {
+            String normalized = normalize(feedingType);
+            return "carnivoro".equals(normalized) || "omnivoro".equals(normalized);
+        }
+
+        private static TargetRule fromAttackTargetText(String rawText) {
+            String normalized = normalize(rawText);
+            if (normalized.isEmpty() || "----".equals(normalized)) {
+                return TargetRule.RANDOM;
+            }
+            if (normalized.contains("menor velocidad")) {
+                return TargetRule.LOWEST_SPEED;
+            }
+            if (normalized.contains("mayor armadura")) {
+                return TargetRule.HIGHEST_ARMOR;
+            }
+            if (normalized.contains("menor persepcion") || normalized.contains("menor percepcion")) {
+                return TargetRule.LOWEST_PERCEPTION;
+            }
+            if (normalized.contains("menor defensa")) {
+                return TargetRule.LOWEST_DEFENSE;
+            }
+            return TargetRule.RANDOM;
+        }
+
+        private static String normalize(String value) {
+            if (value == null) {
+                return "";
+            }
+            String withoutAccents = Normalizer.normalize(value, Normalizer.Form.NFD)
+                    .replaceAll("\\p{M}+", "");
+            return withoutAccents.trim().toLowerCase(Locale.ROOT);
         }
     }
 
