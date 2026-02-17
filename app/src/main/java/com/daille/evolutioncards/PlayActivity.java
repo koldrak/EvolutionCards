@@ -692,6 +692,11 @@ public class PlayActivity extends AppCompatActivity {
                 attackerRef.player.score += resolution.attackPower;
                 maybeApplyAttackStatus(attacker, target.species);
                 maybeApplyDefenseTriggersOnSuccessfulAttack(attackerRef, target, resolution);
+                String successMessage = getSpeciesLabel(attackerRef)
+                        + " ataca por " + resolution.modeLabel + " a " + getSpeciesLabel(target)
+                        + ". Resultado ataque exitoso (daño " + resolution.damage + ").";
+                appendLog(successMessage);
+                showMessage(successMessage + attackDetailsForPlayer);
 
             } else {
                 String failMessage = getSpeciesLabel(attackerRef)
