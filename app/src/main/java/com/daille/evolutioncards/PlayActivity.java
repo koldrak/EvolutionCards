@@ -84,6 +84,7 @@ public class PlayActivity extends AppCompatActivity {
 
     private int currentPlayer = 0;
     private int round = 1;
+    private int forageZoneStoredFood = 0;
     private GameCard activeBiome;
     private Phase currentPhase = Phase.PLAYER_ACTION;
 
@@ -600,11 +601,11 @@ public class PlayActivity extends AppCompatActivity {
     }
 
     private void resolveForagePhase() {
-        int foragePool = random.nextInt(10) + 1;
+        forageZoneStoredFood = random.nextInt(10) + 1;
         int climbingBonus = getForageGrowthBonusFromAbilities();
-        foragePool += climbingBonus;
-        renderForageTokens(foragePool);
-        String diceMessage = "Resultado del dado: " + (foragePool - climbingBonus)
+        forageZoneStoredFood += climbingBonus;
+        renderForageTokens(forageZoneStoredFood);
+        String diceMessage = "Resultado del dado: " + (forageZoneStoredFood - climbingBonus)
                 + ". Se agregan fichas de alimento a la zona de forraje."
                 + (climbingBonus > 0 ? " Bono por Patas Trepadoras: +" + climbingBonus + "." : "");
         appendLog(diceMessage);
@@ -617,19 +618,19 @@ public class PlayActivity extends AppCompatActivity {
                 .reversed());
 
         for (SpeciesRef ref : allSpecies) {
-            if (foragePool <= 0) {
+            if (forageZoneStoredFood <= 0) {
                 break;
             }
             if (!ref.species.canForage()) {
                 continue;
             }
-            int gain = Math.min(Math.max(1, ref.species.getAttack()), foragePool);
-            ref.species.food += gain;
-            foragePool -= gain;
+            int gain = Math.min(Math.max(1, ref.species.getAttack()), forageZoneStoredFood);
+            addFoodTokens(ref.species, gain, true);
+            forageZoneStoredFood -= gain;
             forageParticipants.add(ref);
             ref.species.forageSuccessThisRound = true;
-            renderForageTokens(foragePool);
-            String feedMessage = getSpeciesLabel(ref) + " forrajea +" + gain + " comida (quedan " + foragePool + ").";
+            renderForageTokens(forageZoneStoredFood);
+            String feedMessage = getSpeciesLabel(ref) + " forrajea +" + gain + " comida (quedan " + forageZoneStoredFood + ").";
             appendLog(feedMessage);
             showMessage(feedMessage);
         }
@@ -668,7 +669,7 @@ public class PlayActivity extends AppCompatActivity {
                     target.species.tookPredationDamageThisRound = true;
                     target.species.lastAttacker = attackerRef.player;
                 }
-                attacker.food += resolution.attackPower;
+                addFoodTokens(attacker, resolution.attackPower, true);
                 attackerRef.player.score += resolution.attackPower;
                 maybeApplyAttackStatus(attacker, target.species);
                 maybeApplyDefenseTriggersOnSuccessfulAttack(attackerRef, target, resolution);
@@ -787,6 +788,10 @@ public class PlayActivity extends AppCompatActivity {
                     if (species.lastAttacker != null && species.tookPredationDamageThisRound) {
                         species.lastAttacker.score += 4;
                     }
+                    if (species.symbiosisPartner != null) {
+                        species.symbiosisPartner.symbiosisPartner = null;
+                        species.symbiosisPartner = null;
+                    }
                     player.species.remove(i);
                     String extinctionMessage;
                     if (starvation) {
@@ -809,7 +814,7 @@ public class PlayActivity extends AppCompatActivity {
         for (SpeciesRef ref : collectSpecies()) {
             if (ref.species.hasAbilityText("obtiene mas 1 de alimento cada vez que un individuo es eliminado")
                     || ref.species.hasAbilityText("obtiene más 1 de alimento cada vez que un individuo es eliminado")) {
-                ref.species.food += 1;
+                addFoodTokens(ref.species, 1, true);
                 String message = getSpeciesLabel(ref)
                         + " activa Mandíbula Trituradora y obtiene +1 comida por eliminación de individuo.";
                 appendLog(message);
@@ -989,6 +994,52 @@ public class PlayActivity extends AppCompatActivity {
         return "Especie " + (index + 1) + " de " + ref.player.name;
     }
 
+    private String getSpeciesLabel(SpeciesState species) {
+        SpeciesRef ref = findSpeciesRef(species);
+        return ref == null ? "Especie desconocida" : getSpeciesLabel(ref);
+    }
+
+    private SpeciesRef findSpeciesRef(SpeciesState species) {
+        if (species == null) {
+            return null;
+        }
+        for (SpeciesRef ref : collectSpecies()) {
+            if (ref.species == species) {
+                return ref;
+            }
+        }
+        return null;
+    }
+
+    private void addFoodTokens(SpeciesState species, int amount, boolean triggerSymbiosis) {
+        if (species == null || amount <= 0) {
+            return;
+        }
+        species.food += amount;
+        if (!triggerSymbiosis || species.symbiosisPartner == null) {
+            return;
+        }
+        species.symbiosisPartner.food += amount;
+        String message = getSpeciesLabel(species) + " comparte +" + amount
+                + " comida con " + getSpeciesLabel(species.symbiosisPartner) + " por Simbiosis.";
+        appendLog(message);
+        showMessage(message);
+    }
+
+    private void linkSymbiosis(SpeciesState left, SpeciesState right) {
+        if (left == null || right == null || left == right) {
+            return;
+        }
+        if (left.symbiosisPartner != null) {
+            left.symbiosisPartner.symbiosisPartner = null;
+        }
+        if (right.symbiosisPartner != null) {
+            right.symbiosisPartner.symbiosisPartner = null;
+        }
+        left.symbiosisPartner = right;
+        right.symbiosisPartner = left;
+    }
+
     private AttackResolution resolveAttack(SpeciesRef attackerRef, SpeciesRef defenderRef) {
         SpeciesState attacker = attackerRef.species;
         SpeciesState defender = defenderRef.species;
@@ -1031,6 +1082,9 @@ public class PlayActivity extends AppCompatActivity {
         int attackPower = attacker.getAttack();
         if (attacker.hasCard("A15") || attacker.hasAbilityText("al atacar obtiene +1 de ataque")) {
             attackPower += 1;
+        }
+        if (attacker.hasCard("A36") && defender.hasCardType("Alas")) {
+            attackPower += 2;
         }
         int effectiveArmor = defender.getArmor();
         if (attacker.hasCard("A2") || attacker.hasAbilityText("ignora la armadura de la presa")) {
@@ -1100,13 +1154,13 @@ public class PlayActivity extends AppCompatActivity {
             SpeciesState species = ref.species;
             String primaryJawId = species.getPrimaryJawId();
             if ("A8".equals(primaryJawId) && !species.forageSuccessThisRound) {
-                species.food += 1;
+                addFoodTokens(species, 1, true);
                 String message = getSpeciesLabel(ref) + " activa Mandíbula Filtradora y obtiene +1 comida fuera de la zona de forraje.";
                 appendLog(message);
                 showMessage(message);
             }
             if ("A106".equals(primaryJawId) && !species.forageSuccessThisRound) {
-                species.food += 1;
+                addFoodTokens(species, 1, true);
                 String message = getSpeciesLabel(ref) + " activa Mandíbula de Broteo y obtiene +1 comida al no forrajear.";
                 appendLog(message);
                 showMessage(message);
@@ -1114,7 +1168,7 @@ public class PlayActivity extends AppCompatActivity {
             if (species.forageSuccessThisRound
                     && species.isInAnyBiome("pradera", "estepa")
                     && species.hasAbilityText("si forrajeas en pradera/estepa")) {
-                species.food += 1;
+                addFoodTokens(species, 1, true);
                 String message = getSpeciesLabel(ref) + " obtiene +1 comida adicional por habilidad de forrajeo en Pradera/Estepa.";
                 appendLog(message);
                 showMessage(message);
@@ -1144,7 +1198,7 @@ public class PlayActivity extends AppCompatActivity {
             if (ally.getDietType() == DietType.CARNIVORE) {
                 continue;
             }
-            ally.food += 1;
+            addFoodTokens(ally, 1, true);
             shared += 1;
             if (shared >= 2) {
                 break;
@@ -1163,7 +1217,7 @@ public class PlayActivity extends AppCompatActivity {
         if (!defender.hasCard("A113") || defender.failedAttackFoodBonusAppliedThisRound) {
             return;
         }
-        defender.food += 1;
+        addFoodTokens(defender, 1, true);
         defender.failedAttackFoodBonusAppliedThisRound = true;
         String message = getSpeciesLabel(defenderRef) + " activa Mandíbula de Corte de Corteza y gana +1 comida por ataque fallido recibido.";
         appendLog(message);
@@ -1751,6 +1805,7 @@ public class PlayActivity extends AppCompatActivity {
         int lastStatusAppliedRound = -1;
         int permanentFertilityBonus = 0;
         PlayerState lastAttacker;
+        SpeciesState symbiosisPartner;
 
         DietType getDietType() {
             boolean hasCarnivoreJaw = false;
@@ -1817,6 +1872,18 @@ public class PlayActivity extends AppCompatActivity {
             }
             for (GameCard card : cards) {
                 if (cardId.equalsIgnoreCase(card.id)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        boolean hasCardType(String cardType) {
+            if (cardType == null) {
+                return false;
+            }
+            for (GameCard card : cards) {
+                if (cardType.equalsIgnoreCase(card.type)) {
                     return true;
                 }
             }
@@ -1899,10 +1966,16 @@ public class PlayActivity extends AppCompatActivity {
         int getAbilityBasedStatModifier(String stat) {
             int total = 0;
             if ("speed".equals(stat)) {
+                if (hasCard("A18") && hasCardType("Alas")) {
+                    total += 1;
+                }
                 if (isInAnyBiome("manglar", "manglares", "playa", "arrecife")
                         && (hasAbilityText("manglares y arrecife +1 de velocidad")
                         || hasAbilityText("obtiene +1 de velocidad en manglares, playa y arrecife"))) {
                     total += 1;
+                }
+                if (hasCard("A41") && !isInAnyBiome("manglar", "manglares", "playa", "arrecife")) {
+                    total -= 1;
                 }
                 if (isInAnyBiome("playa", "arrecife") && hasAbilityText("obtiene +1 de velocidad en playa y arrecife")) {
                     total += 1;
@@ -1977,6 +2050,9 @@ public class PlayActivity extends AppCompatActivity {
 
             Pattern valueInBiomes = Pattern.compile("([+-]?\\d+)\\s+de\\s+([a-záéíóúñ]+)\\s+en\\s+([^\\.|]+)");
             for (GameCard card : cards) {
+                if ("speed".equals(stat) && "A41".equalsIgnoreCase(card.id)) {
+                    continue;
+                }
                 CardDesignDetails.DesignCardInfo info = CardDesignDetails.findByGameCard(card);
                 if (info == null || info.ability == null) {
                     continue;
@@ -2150,7 +2226,8 @@ public class PlayActivity extends AppCompatActivity {
             if (magnitude == null || magnitude <= 0) {
                 return;
             }
-            int selectedEffect = random.nextBoolean() ? magnitude : -magnitude;
+            int currentTemperature = getTemperature(activeBiome);
+            int selectedEffect = currentTemperature > 0 ? -magnitude : magnitude;
             String key = normalizeSimple(card.id);
             List<Integer> effects = selectedTemperatureEffects.get(key);
             if (effects == null) {
@@ -2366,17 +2443,17 @@ public class PlayActivity extends AppCompatActivity {
                 owner.hand.remove(random.nextInt(owner.hand.size()));
             }
         }
-        if (ability.contains("coloca 2 de comida") || ability.contains("mueve 2 planta")) {
-            targetSpecies.food += 2;
+        if (ability.contains("coloca 2 de comida") || (ability.contains("mueve 2 planta") && !"A89".equals(cardId))) {
+            addFoodTokens(targetSpecies, 2, true);
         }
         if (ability.contains("queda confundida") || ability.contains("queda confundido")) {
-            SpeciesRef rival = chooseRandomEnemySpecies(owner);
+            SpeciesRef rival = chooseBestEnemySpecies(owner);
             if (rival != null) {
                 rival.species.applyStatus(Status.CONFUNDIDO);
             }
         }
         if (ability.contains("queda en terror")) {
-            SpeciesRef rival = chooseRandomEnemySpecies(owner);
+            SpeciesRef rival = chooseBestEnemySpecies(owner);
             if (rival != null) {
                 rival.species.applyStatus(Status.TERROR);
             }
@@ -2388,9 +2465,10 @@ public class PlayActivity extends AppCompatActivity {
             targetSpecies.health += 2;
         }
         if (ability.contains("mira la mano de un rival") && ability.contains("ese rival la descarta")) {
-            PlayerState rival = chooseRandomEnemyPlayerWithCards(owner);
+            PlayerState rival = chooseEnemyPlayerWithMostCards(owner);
             if (rival != null) {
-                GameCard discarded = rival.hand.remove(random.nextInt(rival.hand.size()));
+                GameCard discarded = selectHighestValueCard(rival.hand);
+                rival.hand.remove(discarded);
                 appendLog(owner.name + " activa descarte de mano rival: " + rival.name
                         + " descarta " + discarded.id + " · " + discarded.name + ".");
             }
@@ -2409,8 +2487,20 @@ public class PlayActivity extends AppCompatActivity {
                 owner.hand.remove(random.nextInt(owner.hand.size()));
             }
             appendLog(owner.name + " activa Mandíbula Canina: roba 1 carta y descarta 1 aleatoria.");
+        } else if ("A32".equals(cardId)) {
+            PlayerState rival = chooseRandomEnemyPlayerWithMinimumCards(owner, 2);
+            List<GameCard> ownCards = extractRandomCardsFromHand(owner, 2, card);
+            if (rival != null && ownCards.size() == 2) {
+                List<GameCard> rivalCards = extractRandomCardsFromHand(rival, 2, null);
+                owner.hand.addAll(rivalCards);
+                rival.hand.addAll(ownCards);
+                appendLog(owner.name + " activa Garras Retráctiles: intercambia 2 cartas con "
+                        + rival.name + ".");
+            } else {
+                owner.hand.addAll(ownCards);
+            }
         } else if ("A37".equals(cardId)) {
-            SpeciesRef chosen = chooseRandomSpeciesRef();
+            SpeciesRef chosen = chooseBestSpeciesRefByTotalAttributes();
             if (chosen != null) {
                 chosen.species.permanentFertilityBonus += 1;
                 appendLog(owner.name + " activa Patas Largas: " + getSpeciesLabel(chosen)
@@ -2418,12 +2508,20 @@ public class PlayActivity extends AppCompatActivity {
             }
         } else if ("A40".equals(cardId)) {
             GameCard handAdaptation = chooseRandomAdaptationFromHand(owner, card);
-            SpeciesRef chosenSpecies = chooseRandomSpeciesRefWithReplaceableAdaptation();
+            SpeciesRef chosenSpecies = chooseBestSpeciesRefWithReplaceableAdaptation();
             if (handAdaptation != null && chosenSpecies != null) {
                 chosenSpecies.species.replaceRandomNonJaw(handAdaptation, random);
                 owner.hand.remove(handAdaptation);
                 appendLog(owner.name + " activa Tentáculos: intercambia una adaptación de mano por una adaptación en "
                         + getSpeciesLabel(chosenSpecies) + ".");
+            }
+        } else if ("A89".equals(cardId)) {
+            int movedFood = Math.min(2, forageZoneStoredFood);
+            if (movedFood > 0) {
+                forageZoneStoredFood -= movedFood;
+                addFoodTokens(targetSpecies, movedFood, true);
+                appendLog(owner.name + " activa Migración Estacional: mueve " + movedFood
+                        + " comida desde la zona de forraje a " + getSpeciesLabel(targetSpecies) + ".");
             }
         } else if ("A43".equals(cardId)) {
             PlayerState rivalDeck = chooseRandomEnemyPlayerWithDeck(owner);
@@ -2446,8 +2544,8 @@ public class PlayActivity extends AppCompatActivity {
             }
         } else if ("A52".equals(cardId)) {
             if (!owner.deck.isEmpty()) {
-                int pick = random.nextInt(owner.deck.size());
-                GameCard tutored = owner.deck.remove(pick);
+                GameCard tutored = selectHighestValueCard(owner.deck);
+                owner.deck.remove(tutored);
                 owner.hand.add(tutored);
                 appendLog(owner.name + " activa Cola Látigo: busca en su mazo y añade a la mano "
                         + tutored.id + " · " + tutored.name + ".");
@@ -2455,24 +2553,33 @@ public class PlayActivity extends AppCompatActivity {
         } else if ("A71".equals(cardId)) {
             int top = Math.min(5, owner.deck.size());
             if (top > 0) {
-                int pick = random.nextInt(top);
-                GameCard selected = owner.deck.remove(pick);
+                List<GameCard> topCards = new ArrayList<>(owner.deck.subList(0, top));
+                GameCard selected = selectHighestValueCard(topCards);
+                owner.deck.remove(selected);
                 owner.hand.add(selected);
                 appendLog(owner.name + " activa Olfato Agudo: mira el top " + top
                         + " y añade a su mano " + selected.id + " · " + selected.name + ".");
             }
         } else if ("A73".equals(cardId)) {
-            PlayerState rival = chooseRandomEnemyPlayerWithCards(owner);
-            GameCard ownCard = chooseRandomCardFromHand(owner, card);
+            PlayerState rival = chooseEnemyPlayerWithMostCards(owner);
+            GameCard ownCard = chooseLowestValueCardFromHand(owner, card);
             if (rival != null && ownCard != null && !rival.hand.isEmpty()) {
-                GameCard rivalCard = rival.hand.remove(random.nextInt(rival.hand.size()));
+                GameCard rivalCard = selectHighestValueCard(rival.hand);
+                rival.hand.remove(rivalCard);
                 owner.hand.remove(ownCard);
                 owner.hand.add(rivalCard);
                 rival.hand.add(ownCard);
                 appendLog(owner.name + " activa Audición Direccional: intercambia 1 carta con " + rival.name + ".");
             }
+        } else if ("A98".equals(cardId)) {
+            SpeciesRef linkedSpecies = chooseRandomSpeciesExcluding(targetSpecies);
+            if (linkedSpecies != null) {
+                linkSymbiosis(targetSpecies, linkedSpecies.species);
+                appendLog(owner.name + " activa Simbiosis entre " + getSpeciesLabel(targetSpecies)
+                        + " y " + getSpeciesLabel(linkedSpecies) + ".");
+            }
         } else if ("A112".equals(cardId)) {
-            targetSpecies.food += 2;
+            addFoodTokens(targetSpecies, 2, true);
             appendLog(owner.name + " activa Pico Granívoro: la especie obtiene +2 comida al jugarla.");
         } else if ("A126".equals(cardId) && activeBiome != null
                 && ("Llanura".equalsIgnoreCase(activeBiome.name) || "Estepa".equalsIgnoreCase(activeBiome.name))) {
@@ -2491,12 +2598,67 @@ public class PlayActivity extends AppCompatActivity {
         return all.get(random.nextInt(all.size()));
     }
 
+    private SpeciesRef chooseBestSpeciesRefByTotalAttributes() {
+        List<SpeciesRef> all = collectSpecies();
+        if (all.isEmpty()) {
+            return null;
+        }
+        SpeciesRef best = all.get(0);
+        for (SpeciesRef candidate : all) {
+            if (candidate.species.getTotalAttributes() > best.species.getTotalAttributes()) {
+                best = candidate;
+            }
+        }
+        return best;
+    }
+
+    private SpeciesRef chooseRandomSpeciesExcluding(SpeciesState excluded) {
+        List<SpeciesRef> all = collectSpecies();
+        List<SpeciesRef> candidates = new ArrayList<>();
+        for (SpeciesRef ref : all) {
+            if (ref.species != excluded) {
+                candidates.add(ref);
+            }
+        }
+        if (candidates.isEmpty()) {
+            return null;
+        }
+        return candidates.get(random.nextInt(candidates.size()));
+    }
+
     private SpeciesRef chooseRandomSpeciesRefWithReplaceableAdaptation() {
         List<SpeciesRef> candidates = new ArrayList<>();
         for (SpeciesRef ref : collectSpecies()) {
             if (ref.species.getNonJawCardCount() > 0) {
                 candidates.add(ref);
             }
+        }
+        if (candidates.isEmpty()) {
+            return null;
+        }
+        return candidates.get(random.nextInt(candidates.size()));
+    }
+
+    private SpeciesRef chooseBestSpeciesRefWithReplaceableAdaptation() {
+        SpeciesRef selected = null;
+        for (SpeciesRef ref : collectSpecies()) {
+            if (ref.species.getNonJawCardCount() == 0) {
+                continue;
+            }
+            if (selected == null || ref.species.getTotalAttributes() > selected.species.getTotalAttributes()) {
+                selected = ref;
+            }
+        }
+        return selected;
+    }
+
+    private PlayerState chooseRandomEnemyPlayerWithMinimumCards(PlayerState owner, int minimumCards) {
+        List<PlayerState> candidates = new ArrayList<>();
+        for (PlayerState player : players) {
+            if (player == owner || player.hand.size() < minimumCards) {
+                continue;
+            }
+            candidates.add(player);
         }
         if (candidates.isEmpty()) {
             return null;
@@ -2516,6 +2678,23 @@ public class PlayActivity extends AppCompatActivity {
             return null;
         }
         return candidates.get(random.nextInt(candidates.size()));
+    }
+
+    private List<GameCard> extractRandomCardsFromHand(PlayerState owner, int count, GameCard excluded) {
+        List<GameCard> pool = new ArrayList<>();
+        for (GameCard card : owner.hand) {
+            if (card != excluded) {
+                pool.add(card);
+            }
+        }
+        List<GameCard> selected = new ArrayList<>();
+        while (selected.size() < count && !pool.isEmpty()) {
+            int pick = random.nextInt(pool.size());
+            GameCard chosen = pool.remove(pick);
+            owner.hand.remove(chosen);
+            selected.add(chosen);
+        }
+        return selected;
     }
 
     private GameCard chooseRandomAdaptationFromHand(PlayerState owner, GameCard excluded) {
@@ -2561,6 +2740,19 @@ public class PlayActivity extends AppCompatActivity {
         return candidates.get(random.nextInt(candidates.size()));
     }
 
+    private PlayerState chooseEnemyPlayerWithMostCards(PlayerState owner) {
+        PlayerState selected = null;
+        for (PlayerState player : players) {
+            if (player == owner || player.hand.isEmpty()) {
+                continue;
+            }
+            if (selected == null || player.hand.size() > selected.hand.size()) {
+                selected = player;
+            }
+        }
+        return selected;
+    }
+
     private SpeciesRef chooseRandomEnemySpecies(PlayerState owner) {
         List<SpeciesRef> enemies = new ArrayList<>();
         for (PlayerState player : players) {
@@ -2575,6 +2767,101 @@ public class PlayActivity extends AppCompatActivity {
             return null;
         }
         return enemies.get(random.nextInt(enemies.size()));
+    }
+
+    private SpeciesRef chooseBestEnemySpecies(PlayerState owner) {
+        SpeciesRef selected = null;
+        for (PlayerState player : players) {
+            if (player == owner) {
+                continue;
+            }
+            for (SpeciesState species : player.species) {
+                SpeciesRef candidate = new SpeciesRef(player, species);
+                if (selected == null || candidate.species.getTotalAttributes() > selected.species.getTotalAttributes()) {
+                    selected = candidate;
+                }
+            }
+        }
+        return selected;
+    }
+
+    private GameCard chooseLowestValueCardFromHand(PlayerState owner, GameCard excluded) {
+        GameCard selected = null;
+        int selectedValue = Integer.MAX_VALUE;
+        for (GameCard card : owner.hand) {
+            if (card == excluded) {
+                continue;
+            }
+            int value = evaluateCardValue(card);
+            if (selected == null || value < selectedValue) {
+                selected = card;
+                selectedValue = value;
+            }
+        }
+        return selected;
+    }
+
+    private GameCard selectHighestValueCard(List<GameCard> cards) {
+        if (cards == null || cards.isEmpty()) {
+            return null;
+        }
+        GameCard selected = cards.get(0);
+        int selectedValue = evaluateCardValue(selected);
+        for (GameCard card : cards) {
+            int value = evaluateCardValue(card);
+            if (value > selectedValue) {
+                selected = card;
+                selectedValue = value;
+            }
+        }
+        return selected;
+    }
+
+    private int evaluateCardValue(GameCard card) {
+        if (card == null) {
+            return Integer.MIN_VALUE;
+        }
+        CardDesignDetails.DesignCardInfo info = CardDesignDetails.findByGameCard(card);
+        int value = parseRarityValue(card.rarity) * 10;
+        if (info != null) {
+            value += Math.max(0, parseStatValue(info.attack));
+            value += Math.max(0, parseStatValue(info.armor));
+            value += Math.max(0, parseStatValue(info.health));
+            value += Math.max(0, parseStatValue(info.speed));
+            value += Math.max(0, parseStatValue(info.perception));
+            value += Math.max(0, parseStatValue(info.fertility));
+        }
+        return value;
+    }
+
+    private int parseRarityValue(String rarity) {
+        if (rarity == null) {
+            return 0;
+        }
+        Matcher matcher = Pattern.compile("(\\d+)").matcher(rarity);
+        if (!matcher.find()) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(matcher.group(1));
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    private int parseStatValue(String raw) {
+        if (raw == null) {
+            return 0;
+        }
+        String cleaned = raw.trim().replace("+", "");
+        if (cleaned.isEmpty() || "-".equals(cleaned) || "----".equals(cleaned)) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(cleaned);
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
     }
 
     private static class JawTargetRules {

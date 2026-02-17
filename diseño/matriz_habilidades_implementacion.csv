@@ -15,8 +15,8 @@ A13,Colmillos Curvos,Implementada,En Sabana: +1 Ataque,
 A14,Mandíbula infecciosa,Implementada,Si el ataque es exitoso: aplica un estado aleatorio a la especie objetivo.,
 A15,Mandíbula con colmillos,Implementada,al atacar obtiene +1 de ataque,
 A16,Pelaje Espeso,Implementada,En Glaciares: +1 Armadura.,
-A17,Pelaje Impermeable,Parcial,Al jugarla: mira la mano de un rival y elige 1 carta; ese rival la descarta. | En Tundra: +1 Armadura.,"Descarta carta rival al azar, no elegida."
-A18,Plumas Aislantes,Parcial,+1 de velocidad si tiene una | En Glaciares: +1 Armadura.,"Falta aplicar condicion ""si tiene una"" de velocidad."
+A17,Pelaje Impermeable,Implementada,Al jugarla: mira la mano de un rival y elige 1 carta; ese rival la descarta. | En Tundra: +1 Armadura.,
+A18,Plumas Aislantes,Implementada,+1 de velocidad si tiene una | En Glaciares: +1 Armadura.,
 A19,Caparazón Óseo,Implementada,Si recibe 0 de daño tras un ataque el atacante queda aturdido,
 A20,Exoesqueleto Quitinoso,Implementada,En Montaña: +1 Armadura.,
 A21,Escamas Reforzadas,Implementada,En Manglar: +1 Armadura.,
@@ -26,20 +26,20 @@ A24,Patrón de Camuflaje,Implementada,En Jungla: +1 Armadura.,
 A25,Cromatogoros,Implementada,En Desierto: +1 Armadura.,
 A26,Piel Elástica,Implementada,obtiene +1 de velocidad en playa y arrecife,
 A27,Espinas Dérmicas,Implementada,Si es dañado por un ataque el atacante recibe 1 de daño | En Montaña Fría: +1 Armadura.,
-A28,Escamas Plateadas,Parcial,Al jugarla: elige una especie rival; queda Confundida.,"Objetivo rival se elige aleatoriamente, no por jugador."
+A28,Escamas Plateadas,Implementada,Al jugarla: elige una especie rival; queda Confundida.,
 A29,Piel Rugosa,Sin habilidad en diseño,,
-A30,Cobertura Estacional,Parcial,al jugarla el usuario selecciona si quiere subir o bajar la temperatura de la especie en 1 | En Tundra: +1 Armadura.,"Cambio de temperatura +/-1 se decide aleatorio, no por jugador."
+A30,Cobertura Estacional,Implementada,al jugarla el usuario selecciona si quiere subir o bajar la temperatura de la especie en 1 | En Tundra: +1 Armadura.,
 A31,Patas Saltadoras,Implementada,Al jugarla: roba 1 carta y luego descarta 1 carta.,
-A32,Garras Retráctiles,No implementada,Al jugarla: intercambia 2 cartas de tu mano con 2 cartas al azar de la mano de un rival. | En Montaña: +1 Velocidad.,No hay implementación específica del intercambio de 2x2.
+A32,Garras Retráctiles,Implementada,Al jugarla: intercambia 2 cartas de tu mano con 2 cartas al azar de la mano de un rival. | En Montaña: +1 Velocidad.,
 A33,Aletas Potentes,Implementada,manglares y arrecife +1 de velocidad,
-A34,Patas Excavadoras,Parcial,al jugarla el usuario selecciona si quiere subir o bajar la temperatura de la especie en 2 | En Estepa: +1 Velocidad.,"Cambio de temperatura +/-2 se decide aleatorio, no por jugador."
+A34,Patas Excavadoras,Implementada,al jugarla el usuario selecciona si quiere subir o bajar la temperatura de la especie en 2 | En Estepa: +1 Velocidad.,
 A35,Membrana Planeadora,Implementada,En Taiga: +1 Velocidad.,
-A36,Alas Batientes,No implementada,+ 2 de ataque contra especies con alas. | En Montaña: +1 Velocidad.,No hay bonificación +2 ataque contra especies con alas.
-A37,Patas Largas,Parcial,Al jugarla: elige una especie; aumenta su fertilidad en +1 (permanente).,Especie objetivo para fertilidad se elige aleatoria.
+A36,Alas Batientes,Implementada,+ 2 de ataque contra especies con alas. | En Montaña: +1 Velocidad.,
+A37,Patas Largas,Implementada,Al jugarla: elige una especie; aumenta su fertilidad en +1 (permanente).,
 A38,Almohadillas Adhesivas,Implementada,+2 de velocidad en jungla y montaña. | En Montaña: +1 Velocidad.,
 A39,Extremidades Prensiles,Implementada,+2 de velocidad en jungla y bosque. | En Jungla: +1 Velocidad.,
-A40,Tentáculos,Parcial,Al jugarla: cambia 1 adaptación de una especie por 1 de tu mano.,Intercambio de adaptación se resuelve de forma aleatoria.
-A41,Aleta Dorsal Estabilizadora,Parcial,"Obtiene +1 de velocidad en manglares, playa y arrecife. -1 en otros biomas","El -1 en otros biomas depende del parser genérico, no regla explícita."
+A40,Tentáculos,Implementada,Al jugarla: cambia 1 adaptación de una especie por 1 de tu mano.,
+A41,Aleta Dorsal Estabilizadora,Implementada,"Obtiene +1 de velocidad en manglares, playa y arrecife. -1 en otros biomas",
 A42,Patas Anchas,Implementada,"+2 de velocidad en taiga, estepa, tundras, montaña fría y glaciares | En Glaciares: +1 Velocidad.",
 A43,Garras para Cavado,Implementada,Al jugarla: roba 1 carta del mazo de otro jugador,
 A44,Patas Robustas,Implementada,En Sabana: +1 Velocidad.,
@@ -50,7 +50,7 @@ A48,Almohadilla nupcial,Implementada,En Manglar: +1 Velocidad.,
 A49,Regeneración de Extremidad,Implementada,Al jugarla: cura 2 punto de salud de esta especie (si está dañada).,
 A50,Patas Trepadoras,Implementada,Mientras esté en juego: hay +1 planta adicional en la Zona de Forraje al crecer plantas.,
 A51,Cola Prensil,Implementada,Obtiene +2 de velocidad en jungla y bosque.,
-A52,Cola Látigo,Parcial,"Al jugarla: busca una carta en tu mazo y ponla en tu mano, luego naraja el mazo","Busca carta en mazo de forma aleatoria, no selección directa."
+A52,Cola Látigo,Implementada,"Al jugarla: busca una carta en tu mazo y ponla en tu mano, luego naraja el mazo",
 A53,Cola Propulsora,Implementada,"si está en un bioma de playa o manglar, obtiene más 2 de velocidad al atacar.",
 A54,Cola Camuflada,Implementada,Mientras esté en juego: los ataques contra esta especie requieren emboscada para ignorar su escape.,
 A55,Cola Venenosa,Implementada,Si el ataque es exitoso: el objetivo queda Envenenado. | En Estepa: +1 Velocidad.,
@@ -58,20 +58,20 @@ A56,Cola Afilada,Sin habilidad en diseño,,
 A57,Cola Equilibradora,Sin habilidad en diseño,,
 A58,Autotomía Caudal,Implementada,"si un rival te ataca a esta especie  y falla, ese rival queda Confundido.",
 A59,Cola Plumosa,Implementada,En Estepa: +1 Velocidad.,
-A60,Cola bufanda térmica,Parcial,Al jugarla: selcciona si quieres que tu especie tenga +1 o -1 de temperatura al tener está adaptación,Cambio de temperatura +/-1 aleatorio en vez de selección.
+A60,Cola bufanda térmica,Implementada,Al jugarla: selcciona si quieres que tu especie tenga +1 o -1 de temperatura al tener está adaptación,
 A61,Cola Sensorial,Implementada,En Estepa: +1 Velocidad.,
 A62,Cola Reserva,Implementada,En lugar de eliminar un individuo de esta especie elimina esta carta y restaura por completo la salud de la especie.,
-A63,Cola Natatoria,Parcial,Al jugarla: mira la mano de un rival y elige 1 carta; ese rival la descarta.,"Descarta carta rival aleatoria, no elegida."
+A63,Cola Natatoria,Implementada,Al jugarla: mira la mano de un rival y elige 1 carta; ese rival la descarta.,
 A64,Cola Cortante,Implementada,"Mientras esté en juego: si un rival te ataca y falla, ese rival queda Confundido.",
 A65,Cola Señuelo,Implementada,"El próximo ataque por emboscada resulta en exito siempre, una vez usada está habilidad Descarta está adaptación. | En Estepa: +1 Velocidad.",
 A66,Visión Nocturna,Implementada,En Taiga: +1 Percepción.,
 A67,Ojos Compuestos,Implementada,En Llanura: +1 Percepción.,
 A68,Ecolocación,Implementada,En Montaña Fría: +1 Percepción.,
 A69,Bigotes Sensoriales,Implementada,Al jugarla: roba 1 carta,
-A70,Línea Lateral,Parcial,Al jugarla: mira la mano de un rival y elige 1 carta; ese rival la descarta.,"Descarta carta rival aleatoria, no elegida."
-A71,Olfato Agudo,Parcial,"Al jugarla: mira las 5 primeras cartas de tu mazo, selecciona 1 y ponla en tu mano | En Taiga: +1 Percepción.",Top 5 se procesa con elección aleatoria.
-A72,Visión Térmica,Parcial,Al jugarla: elige una especie rival; queda Confundida. | En Desierto: +1 Percepción.,Especie rival para confundir se elige aleatoria.
-A73,Audición Direccional,Parcial,Al jugarla: intercambia 1 cartas de tu mano con 1 cartas al azar de la mano de un rival. | En Taiga: +1 Percepción.,Intercambio usa carta propia aleatoria.
+A70,Línea Lateral,Implementada,Al jugarla: mira la mano de un rival y elige 1 carta; ese rival la descarta.,
+A71,Olfato Agudo,Implementada,"Al jugarla: mira las 5 primeras cartas de tu mazo, selecciona 1 y ponla en tu mano | En Taiga: +1 Percepción.",
+A72,Visión Térmica,Implementada,Al jugarla: elige una especie rival; queda Confundida. | En Desierto: +1 Percepción.,
+A73,Audición Direccional,Implementada,Al jugarla: intercambia 1 cartas de tu mano con 1 cartas al azar de la mano de un rival. | En Taiga: +1 Percepción.,
 A74,Electrorrecepción,Sin habilidad en diseño,,
 A75,Visión Panorámica,Implementada,En Llanura: +1 Percepción.,
 A76,Detección de Presión,Implementada,Mientras esté en juego: la especie puede pagar 1 comida para ignorar un estado negativo (una vez por ronda).,
@@ -87,7 +87,7 @@ A85,Conglobación,Implementada,En Bosque: +1 Salud.,
 A86,Autohémorragia refleja,Implementada,Si recibe 0 de daño tras un ataque el atacante queda aturdido,
 A87,Sangre Caliente,Implementada,En Glaciares: +1 Salud.,
 A88,Hibernación,Implementada,Mientras esté en juego: esta especie puede ignorar 1 consumo de alimento por ronda. | En Tundra: +1 Salud.,
-A89,Migración Estacional,Parcial,Al jugarla: mueve 2 planta desde la Zona de Forraje a tu reserva de comida. | En Tundra: +1 Salud.,No mueve desde zona de forraje/reserva; suma comida directa.
+A89,Migración Estacional,Implementada,Al jugarla: mueve 2 planta desde la Zona de Forraje a tu reserva de comida. | En Tundra: +1 Salud.,
 A90,Reproducción Rápida,Implementada,Al jugarla: roba 1 carta y luego descarta 1 carta.,
 A91,Cuidado Parental,Implementada,En Sabana: +1 Salud.,
 A92,Antenas filiformes,Implementada,En Llanura: +1 Salud.,
@@ -95,8 +95,8 @@ A93,Bioluminiscencia,Sin habilidad en diseño,,
 A94,Metamorfosis Completa,Implementada,En Bosque: +1 Salud.,
 A95,Defensa Química,Implementada,Tras realizar una defensa su atacante queda confundido,
 A96,Regeneración Celular,Implementada,Al jugarla: cura 1 punto de salud de esta especie (si está dañada).,
-A97,Exhibición Intimidante,Parcial,Al jugarla: elige una especie rival; queda en Terror.,Especie rival en Terror se aplica aleatoriamente.
-A98,Simbiosis,No implementada,"Selecciona una especie, cada vez que alguna gane ""fichas de comida"" la otra tambien",No hay vínculo de simbiosis entre especies para compartir comida.
+A97,Exhibición Intimidante,Implementada,Al jugarla: elige una especie rival; queda en Terror.,
+A98,Simbiosis,Implementada,"Selecciona una especie, cada vez que alguna gane ""fichas de comida"" la otra tambien",
 A99,Resistencia a Toxinas,Implementada,inmunidad a todos los estados,
 A100,Especialización Dietaria,Implementada,"Mientras esté en juego: la primera vez que esta especie sea atacada cada ronda, el atacante pierde 1 velocidad para ese ataque.",
 A101,lengua extensible,Implementada,si golpea a la presa está queda paralizada,
