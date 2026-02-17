@@ -1497,9 +1497,6 @@ public class PlayActivity extends AppCompatActivity {
         if (!"mandíbula".equalsIgnoreCase(card.type)) {
             return "";
         }
-        if (!isPredatorFeedingType(designInfo.feedingType)) {
-            return "";
-        }
         if (isBlankOrDash(designInfo.attackTarget)) {
             return "";
         }
@@ -1608,6 +1605,7 @@ public class PlayActivity extends AppCompatActivity {
         for (GameCard card : species.cards) {
             CardDesignDetails.DesignCardInfo designInfo = CardDesignDetails.findByGameCard(card);
             String statsText = buildStatsText(designInfo);
+            String attackTargetText = buildAttackTargetText(card, designInfo);
             String abilityText = buildAbilityText(designInfo);
             builder.append("• ")
                     .append(card.id)
@@ -1621,6 +1619,9 @@ public class PlayActivity extends AppCompatActivity {
                     .append("\n")
                     .append("   Estadísticas: ")
                     .append(statsText.isEmpty() ? "No modifica estadísticas." : statsText)
+                    .append("\n")
+                    .append("   ")
+                    .append(attackTargetText.isEmpty() ? "Objetivo de ataque: No especificado." : attackTargetText)
                     .append("\n")
                     .append("   Habilidad: ")
                     .append(abilityText)
