@@ -296,8 +296,10 @@ public class PlayActivity extends AppCompatActivity {
 
                     GameCard c1 = human.hand.get(indexes.get(0));
                     GameCard c2 = human.hand.get(indexes.get(1));
-                    if (!isJaw(c1) && !isJaw(c2)) {
-                        appendLog("La especie necesita al menos 1 carta de tipo mandíbula.");
+                    boolean c1Jaw = isJaw(c1);
+                    boolean c2Jaw = isJaw(c2);
+                    if (!(c1Jaw ^ c2Jaw)) {
+                        appendLog("La especie debe tener exactamente 1 carta de tipo mandíbula.");
                         return;
                     }
 
@@ -474,10 +476,16 @@ public class PlayActivity extends AppCompatActivity {
         }
 
         int jawHandIndex = jawIndexes.get(random.nextInt(jawIndexes.size()));
-        int secondIndex = random.nextInt(player.hand.size());
-        while (secondIndex == jawHandIndex && player.hand.size() > 1) {
-            secondIndex = random.nextInt(player.hand.size());
+        List<Integer> nonJawIndexes = new ArrayList<>();
+        for (int i = 0; i < player.hand.size(); i++) {
+            if (!isJaw(player.hand.get(i))) {
+                nonJawIndexes.add(i);
+            }
         }
+        if (nonJawIndexes.isEmpty()) {
+            return false;
+        }
+        int secondIndex = nonJawIndexes.get(random.nextInt(nonJawIndexes.size()));
 
         GameCard first = player.hand.get(Math.max(jawHandIndex, secondIndex));
         GameCard second = player.hand.get(Math.min(jawHandIndex, secondIndex));
@@ -2150,7 +2158,7 @@ public class PlayActivity extends AppCompatActivity {
         }
 
         int getAdaptationHealth() {
-            return getNonJawCardCount();
+            return cards.size();
         }
 
         boolean replaceRandomNonJaw(GameCard replacement, Random random) {
